@@ -182,7 +182,6 @@ constexpr std::array<std::array<double, 3>, 7> anchorOffsets = {{
     {{74.917_mm, -4._mm, -19.694_mm}},
 }};
 
-
 int main() {
     std::unique_ptr<MotorController> teensy;
     try {

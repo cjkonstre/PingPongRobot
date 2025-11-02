@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # ===== Dependencies =====
 find_package(OpenCV REQUIRED)
 find_package(Boost 1.66 REQUIRED COMPONENTS system)
+find_package(Threads REQUIRED)
 
 
 # === Ruckig ===
@@ -71,7 +72,6 @@ target_link_libraries(matplotlibcpp INTERFACE Python3::Python Python3::NumPy)
 #arducam
 #find_package(arducam_evk_sdk REQUIRED)
 
-
 # --- Common include dirs (for OpenCV)
 include_directories(${OpenCV_INCLUDE_DIRS},
                     ${CMAKE_SOURCE_DIR}/lib)
@@ -100,27 +100,27 @@ endfunction()
 # Utils (plotting, etc.)
 set(UTIL_LIBS matplotlibcpp) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
 set(VISION_LIBS ${OpenCV_LIBS} )#arducam_evk_sdk::arducam_evk_sdk)
+set(KIN_LIBS Threads::Threads ruckig eigen Boost::system)
 
 # ===== Executables =====
 
 # Everything in src/ with Ruckig + Eigen + OpenCV
 add_execs("${CMAKE_SOURCE_DIR}/src"
   PREFIX ""
-  LIBS ${UTIL_LIBS} ruckig eigen ${OpenCV_LIBS}
+  LIBS ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
 )
 
 # Everything in tools/ with Ruckig + Eigen + OpenCV
 add_execs("${CMAKE_SOURCE_DIR}/tools"
   PREFIX ""
-  LIBS ${UTIL_LIBS} ruckig eigen ${OpenCV_LIBS}
+  LIBS ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
 )
 
 #tets
 
-# Everything in tests/kinematics with Ruckig + Eigen
 add_execs("${CMAKE_SOURCE_DIR}/tests/kinematics"
   PREFIX "test_"
-  LIBS ${UTIL_LIBS} ruckig eigen Boost::system pthread
+  LIBS ${UTIL_LIBS} ${KIN_LIBS} pthread
 )
 
 add_execs("${CMAKE_SOURCE_DIR}/tests/vision"

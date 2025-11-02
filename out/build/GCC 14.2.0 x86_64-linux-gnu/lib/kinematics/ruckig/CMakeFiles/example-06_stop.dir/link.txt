@@ -1,0 +1,1 @@
+/usr/bin/g++  -g   CMakeFiles/example-06_stop.dir/examples/06_stop.cpp.o  -o example-06_stop  -Wl,-rpath,"/home/connor/PingPongRobot/out/build/GCC 14.2.0 x86_64-linux-gnu/lib/kinematics/ruckig" libruckig.so 

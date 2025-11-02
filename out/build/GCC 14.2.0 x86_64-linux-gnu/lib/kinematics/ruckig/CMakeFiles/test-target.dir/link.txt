@@ -1,0 +1,1 @@
+/usr/bin/g++  -g   CMakeFiles/test-target.dir/test/test_target.cpp.o  -o test-target  -Wl,-rpath,"/home/connor/PingPongRobot/out/build/GCC 14.2.0 x86_64-linux-gnu/lib/kinematics/ruckig" libruckig.so 

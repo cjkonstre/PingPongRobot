@@ -1,0 +1,1 @@
+/usr/bin/g++  -g   CMakeFiles/example-08_per_section_minimum_duration.dir/examples/08_per_section_minimum_duration.cpp.o  -o example-08_per_section_minimum_duration  -Wl,-rpath,"/home/connor/PingPongRobot/out/build/GCC 14.2.0 x86_64-linux-gnu/lib/kinematics/ruckig" libruckig.so 

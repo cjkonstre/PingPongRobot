@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Site BuildName="Linux-g++"
+	BuildStamp="20251027-0008-Experimental"
+	Name="leto-T440s"
+	Generator="ctest-3.16.3"
+	CompilerName="/usr/bin/g++"
+	CompilerVersion="9.4.0"
+	OSName="Linux"
+	Hostname="leto-T440s"
+	OSRelease="5.15.0-139-generic"
+	OSVersion="#149~20.04.1-Ubuntu SMP Wed Apr 16 08:29:56 UTC 2025"
+	OSPlatform="x86_64"
+	Is64Bits="1"
+	VendorString="GenuineIntel"
+	VendorID="Intel Corporation"
+	FamilyID="6"
+	ModelID="69"
+	ProcessorCacheSize="3072"
+	NumberOfLogicalCPU="4"
+	NumberOfPhysicalCPU="2"
+	TotalVirtualMemory="2047"
+	TotalPhysicalMemory="7816"
+	LogicalProcessorsPerPhysical="2"
+	ProcessorClockFrequency="1853.44"
+	>
+	<Testing>
+		<StartDateTime>Oct 27 16:44 PDT</StartDateTime>
+		<StartTestTime>1761608672</StartTestTime>
+		<TestList/>
+		<EndDateTime>Oct 27 16:44 PDT</EndDateTime>
+		<EndTestTime>1761608672</EndTestTime>
+		<ElapsedMinutes>0</ElapsedMinutes>
+	</Testing>
+</Site>

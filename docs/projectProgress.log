@@ -1,0 +1,52 @@
+this is a little text log file for what has been accomplished/time committed to
+project started mid august
+
+8/<21: did some motor stuff
+
+8/~21: created markergen script, generated aruco markers for table and put them up
+
+8/25: formulated architecture of the project, created bulk of file layout
+vision, player, kinematics. probably in a sequential update loop
+
+8/26: ball tracking dots put on ball
+    tried blob detection for markers, didnt w
+
+8/27-28: computer failing, many annoying things happened. didnt charge, tried time machine but failed, died before could reinstall OS, annoying things
+printed/designed improved pulleys, and put on motors
+assembled combined motor pair drivers, happy w/ that
+
+8/29: did math for figuring out inverse kinematics with velocity. 
+implemented simple linear algebra for easy implementation, is never easy took forever. migrated to linalg vecs for support
+implemented simple IK object to handle ik w/ vel and all that.
+
+8/30: got new computer set up! still missing half of it
+assembled and wired new motor driver pair, looks good. also did power connection
+designed ethernet hub pcb, and PAINSTAKINGLY wired it up. took 2hrs. only one port done.
+doing math for figuring out inverse kinematics in 3d, matrix transformations and allat
+using normal vecs now for orientation
+
+8/31 got ubuntu 20.04 on thinkpad for ros. migrating fusion files over to new computer + proj. folder
+designed pretty much entire triaxis system, doing some minor rework of project layout
+
+9/1 redesigned good amount of triaxis models
+reconfigured vscode and cmake and changed cmakelists a bunch so now it should work
+redesigned and printed out everything for triaxis except new pulleys, running out of bolts!
+
+9/<~12 did a lot of work on assembling and testing triaxis kinematics, and PC communication with the teensy.
+comms are all good, kinematics look great, good video doc around this time. cable tensioners need to be redesigned. 
+also implemented a full fledged kinematics object.
+sliding into wok on vision.
+
+9/12 lots of thought on the vision side of things, need some fiducials on the ball to help with detection
+thought o fitting ellipses to geodesics on makers on ball to find center -- didnt rly work out as edges of markers arent pictured wll enouh
+another was point clouds to fnd center -- didnt rly work out as points were very subject to motion blur
+a midpoint between these two approaches was looked for a lot, mostly different tilings of the sphere and smart geometric approaches. < spent multiple hours here
+last resort use a neural net -- slow and bulky, and ineligant
+
+9/13 did scripting tests to try and detect the ball markings, didnt end up working vey well, ball seems impossible to find.
+even with ROI tracking/prediction, in a limited region ball, even w/ markings, is very hard to find in grayscale
+lots of thought went into ^^, use of a depth feild camera (ms kinect, probs) -- will use this for global identification. 7x slower than ROI cams tho
+decided to go simple and take advantage of the very unique color of the ball with color cams. more expensive but only option really
+will suppliment with depth feild camera for global identification and more (accurate?) 3d position estimation
+
+9/14 did work on coloredball detection, working great. 

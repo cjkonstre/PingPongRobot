@@ -1,0 +1,1 @@
+/usr/bin/g++  -g   CMakeFiles/test_triAxisMotion.dir/tests/kinematics/triAxisMotion.cpp.o  -o bin/test_triAxisMotion  -Wl,-rpath,"/home/connor/PingPongRobot/out/build/GCC 14.2.0 x86_64-linux-gnu/lib/kinematics/ruckig" lib/kinematics/ruckig/libruckig.so /usr/lib/x86_64-linux-gnu/libboost_system.so.1.71.0 -lpthread /usr/lib/x86_64-linux-gnu/libpython3.8.so 

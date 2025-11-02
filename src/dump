@@ -1,0 +1,112 @@
+#include <iostream>
+#include <ruckig/ruckig.hpp>
+
+using namespace ruckig;
+
+
+Ruckig<3> ruck {0.001}; //# DoFs; control cycle [s]
+InputParameter<3> input;
+OutputParameter<3> output;
+
+std::array<double, 3> getCurrentPositions() {
+    //robotPose = vision.getPose();//do we trust the camera identification more than our actuators? aruco markers are pretty stable...
+    //slack will be from cable tensioners. input current positions in terms of cable lengths and then translate that into pulley/motor states
+
+    //forward predict position if camera latency is significant (would need velocity)
+    //can get velocity from backtranslating known motor step rates from stepper controller to cable velociies, if the step rates may have some error in them
+
+    //cableLengths = doIK(robotPose);
+    //return cableLengths;
+}
+
+
+enum RobotState {
+    BALL_SHOT, //going to hit ball
+    GOING_HOME, //going home
+    IDLE, //idle
+};
+
+
+int main() {
+    input.current_position = {0, 0, 0};
+    input.current_velocity = {0, 0, 0};
+    //input.current_acceleration = {0, 0, 0};
+
+    input.max_velocity = {20, 20, 20};
+    input.max_acceleration = {10, 10, 10};
+    //input.max_jerk = {...};
+
+    RobotState robotState = RobotState::IDLE;
+    MotionState<3> targetState;
+
+    MotionState<3> homeState;
+    homeState.qs = {0, 0, 0}; //initialize home state. can be modified
+    homeState.dqs = {0, 0, 0}; 
+
+    unsigned long frameN=0;
+    MotionFrame<3> frame;
+    frame.dt = 0.001;
+    MotionPacket<3, 10> packet;
+
+    bool running=true;
+    while (running) { //everything loop. always running. this is the robot controller
+        //all positions/states will be in cable DoF states. this will get translated to pulley states. the reason for this is to combat drift due to puley tensioners
+        //this translation should work, as the offset isnt a complex relation to the pulley state. either linear or constant ish
+
+        vision.update(); //updates all in vision stuff. looks for ball, finds table, idk
+
+        //feed actual state into path planner. not garanteed that the robot will be exactly where we want it to be
+        input.current_position = getCurrentPositions();
+        input.current_velocity = output.new_velocity; //readCurrentVelocities(); velocity is more prone to error than position. depends how much we want this
+
+        //recalc target depending on how the ball trajectory has been updated
+        if (ballIncoming) {
+            robotState = RobotState::BALL_SHOT;
+            targetState = getTarget_shotState(); //gets how to hit ball
+        } //decides where the robot is going for
+
+        input.target_position = targetState.qs;
+        input.target_velocity = targetState.dqs;
+
+        auto result = ruck.update(input, output); //calculates into output ; output.new_* is the state dt secs in the future
+        std::cout << "be there in " << output.trajectory.get_duration() << "s";
+
+        int packetFrame = frameN%10;
+        if (packetFrame == 0) { //packet done
+            packet.send();
+            packet.packetId = frameN;
+            packet.packetLength = 0;
+        } //initialize packet
+
+        //fill frame and packet
+        frame.frameIdx = frameN;
+        frame.q_new = output.new_position;
+        frame.dq_new = output.new_velocity;
+
+        packet.frames[packetFrame] = frame;
+        packet.packetLength++;
+
+        if (result == Result::Finished) {
+            packet.send();
+
+            if (robotState == RobotState::BALL_SHOT){ //if just hit ball
+
+                targetState = homeState;
+                ballIncoming = false; //from vision. reset it here to maybe decrease chances of false positive?
+                robotState = RobotState::GOING_HOME;
+
+            } else if (robotState == RobotState::GOING_HOME) { //if just got home
+
+                robotState = RobotState::IDLE;
+
+            }
+
+
+            //at target, can wait or update target -- for example go back to center/optimal wait position now, i.e set target pos to center
+        }
+
+        frameN++;
+    }
+
+    std::cout << "\n";
+}

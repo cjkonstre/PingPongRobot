@@ -1,0 +1,1 @@
+/usr/bin/g++  -g   CMakeFiles/example-10_dynamic_dofs_waypoints.dir/examples/10_dynamic_dofs_waypoints.cpp.o  -o example-10_dynamic_dofs_waypoints  -Wl,-rpath,"/home/connor/PingPongRobot/out/build/GCC 14.2.0 x86_64-linux-gnu/lib/kinematics/ruckig" libruckig.so 

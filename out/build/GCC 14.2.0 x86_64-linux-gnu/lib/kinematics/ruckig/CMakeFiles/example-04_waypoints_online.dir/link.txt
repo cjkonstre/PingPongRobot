@@ -1,1 +1,0 @@
-/usr/bin/g++  -g   CMakeFiles/example-04_waypoints_online.dir/examples/04_waypoints_online.cpp.o  -o example-04_waypoints_online  -Wl,-rpath,"/home/connor/PingPongRobot/out/build/GCC 14.2.0 x86_64-linux-gnu/lib/kinematics/ruckig" libruckig.so 

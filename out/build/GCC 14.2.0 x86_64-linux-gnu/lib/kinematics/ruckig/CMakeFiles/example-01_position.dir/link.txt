@@ -1,1 +1,0 @@
-/usr/bin/g++  -g   CMakeFiles/example-01_position.dir/examples/01_position.cpp.o  -o example-01_position  -Wl,-rpath,"/home/connor/PingPongRobot/out/build/GCC 14.2.0 x86_64-linux-gnu/lib/kinematics/ruckig" libruckig.so 

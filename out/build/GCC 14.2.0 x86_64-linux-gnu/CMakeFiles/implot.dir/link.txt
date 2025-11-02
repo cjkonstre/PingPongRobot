@@ -1,2 +1,0 @@
-/usr/bin/ar qc libimplot.a  CMakeFiles/implot.dir/lib/utils/implot/implot.cpp.o CMakeFiles/implot.dir/lib/utils/implot/implot_items.cpp.o
-/usr/bin/ranlib libimplot.a

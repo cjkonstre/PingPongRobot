@@ -35,4 +35,4 @@ constexpr std::array<std::array<double, 3>, 7> paddle_anchorOffsets = {{
     {{74.917_mm, -4._mm, -19.694_mm}},
 }};
 
-constexpr std::array<std::array<double, 3>, 7> pulley_anchorOffsets_RefOri = {0, 1, 0};
+constexpr std::array<std::array<double, 3>, 7> pulley_anchorOffsets_refOri = {0, 1, 0};

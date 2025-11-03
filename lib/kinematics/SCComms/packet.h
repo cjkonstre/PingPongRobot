@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kinematics/kinUtil.h>
+#include <array>
 #include <cstdint>
 
 #pragma pack(push, 1)

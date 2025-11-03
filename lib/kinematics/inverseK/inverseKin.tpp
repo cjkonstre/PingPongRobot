@@ -92,7 +92,7 @@ KinematicsSolver<cableDOFS>::doIK(
     Eigen::Vector3d objPos, Eigen::Vector3d objnormal, Eigen::Vector3d objVel) 
 {
     Eigen::Matrix<double, 3, cableDOFS> anchorpoints = getAnchorPoints(objPos, objnormal);
-    Eigen::RowVector<double, cableDOFS> cablelens = getCableLens(anchorpoints) - cableZeroLens;
+    Eigen::RowVector<double, cableDOFS> cablelens = getCableLens(anchorpoints);
     Eigen::RowVector<double, cableDOFS> cablevels = getCableVels(anchorpoints, objVel);
 
     std::array<double, cableDOFS> cablelens_vec, cablevels_vec;

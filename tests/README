@@ -1,4 +1,6 @@
 automated tests, no human judjement passed in these lands. like testing linalg etc. 
-if more geared towards interactive/explanatory, put in /demos
+if more geared towards interactive/explanatory, put in /demos (now in /src)
 
 mirrors lib layout
+kinda a development zone/ pericewise testing zone. 
+if tests become more mature into kinda demo territory move them

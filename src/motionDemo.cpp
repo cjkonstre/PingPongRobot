@@ -1,21 +1,9 @@
 #include <boost/asio.hpp>
 #include <iostream>
-#include "kinematics/SCComms/packet.h"
+
 #include "kinematics/inverseK/inverseKin.hpp"
-#include <array>
-
-#include "iostream"
-
-#define DOFS 7
-constexpr double PI  = 3.1415;
-
-constexpr double operator ""_cm(long double val) {return val/100;}
-constexpr double operator ""_mm(long double val) {return val/1000;}
-constexpr double operator ""_ft(long double val) {return val*0.3048;}
-constexpr double operator ""_in(long double val) {return val/12*0.3048;}
-
-using Frame = MotionFrameD<DOFS>;
-using Packet = MotionPacketD<DOFS, 5>;
+#include "core/measurements/dimensions.h"
+#include "core/config.h"
 
 Packet actionPacket(Frame action) {
     Packet packet;
@@ -77,7 +65,6 @@ class MotorController {
             actionPacket.packetId = comm;
             sendPacket(actionPacket);
         }
-
 };
 
 //pseudo-manual home -- increment until set.
@@ -155,33 +142,6 @@ void home_presetPos(MotorController& controller, std::array<double, DOFS> preset
     //loop over and do micro adjustments to make cables nice and taught?
 }
 
-//units in m
-//relative to table height
-#define TABLE_HEIGHT 29.75_in //roughly
-#define TABLE_WIDTH 5._ft //x, width of table
-#define TABLE_LENGTH 4.5_ft //y, length of half table !!
-constexpr std::array<std::array<double, 3>, 7> pulleyPoss = {{
-    {{TABLE_WIDTH + 1.5_ft + 1._cm, TABLE_LENGTH-3._cm, 6._ft+3.7_cm - TABLE_HEIGHT}},
-    {{TABLE_WIDTH+30._cm, TABLE_LENGTH-3._cm, 26.75_in+8.5_cm - TABLE_HEIGHT}},
-    {{-18._in+2._cm, -2._ft+3.5_in+3._cm, 2.5_ft+3.7_cm-TABLE_HEIGHT}},
-    {{TABLE_WIDTH/2-3.5_cm, -2._ft+3.5_in+3._cm, 64.75_in-TABLE_HEIGHT}},
-    {{-1.5_ft -1._cm, TABLE_LENGTH-3._cm, 6._ft+3.7_cm - TABLE_HEIGHT}},
-    {{-30._cm, TABLE_LENGTH-3._cm, 26.75_in+8.5_cm - TABLE_HEIGHT}},
-    {{TABLE_WIDTH+18._in-2._cm, -2._ft+3.5_in+3._cm, 2.5_ft+3.7_cm-TABLE_HEIGHT}},
-}};
-
-//w/ ref to paddle facing forward
-constexpr double paddleHeight = 157.49_mm;
-constexpr std::array<std::array<double, 3>, 7> anchorOffsets = {{
-    {{59.887_mm, -4._mm, 47.225_mm}},
-    {{42.352_mm, -4._mm, -78.264_mm}},
-    {{-74.917_mm, -4._mm, -19.694_mm}},
-    {{0, -4._mm, paddleHeight/2}},
-    {{-42.352_mm, -4._mm, -78.264_mm}},
-    {{-59.887_mm, -4._mm, 47.225_mm}},
-    {{74.917_mm, -4._mm, -19.694_mm}},
-}};
-
 int main() {
     std::unique_ptr<MotorController> teensy;
     try {
@@ -190,13 +150,12 @@ int main() {
         teensy = std::make_unique<MotorController>("/dev/ttyACM1");
     }
 
-    KinematicsSolver<DOFS> kin(pulleyPoss, anchorOffsets, {0, 1, 0});
-    kin.cableZeroLens = {0,0,0,0,0,0,0};//make sure
+    KinematicsSolver<DOFS> kin(frame_pulleyPoss, paddle_anchorOffsets, pulley_anchorOffsets_RefOri);
 
     //preset ori
     Eigen::Vector3d initPos(TABLE_WIDTH/2, TABLE_LENGTH-paddleHeight/2, 4._mm);
     Eigen::Vector3d initOri(0, 0, 1);
-    std::array<double, 7> presetQs = kin.doIK(initPos, initOri, Eigen::Vector3d::Zero()).qs;
+    std::array<double, DOFS> presetQs = kin.doIK(initPos, initOri, Eigen::Vector3d::Zero()).qs;
 
     //not sure if this will work -- not sure if the packet truncation functionaloty will be interrete docrrectly
     //also be interesting to see how the motorcontroller deals w/ this trncated packet 

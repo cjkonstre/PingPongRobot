@@ -50,3 +50,19 @@ decided to go simple and take advantage of the very unique color of the ball wit
 will suppliment with depth feild camera for global identification and more (accurate?) 3d position estimation
 
 9/14 did work on coloredball detection, working great. 
+
+< 11/1: didnt log much 
+built entire frame, set it up, wired it up, much screwing
+spent good amount of time working on kinematics and such
+fixed 6d kinematics code, works great now
+develped multiple homing systems, settled on putting paddle in position, tightening all the motors and then letting it know that the cables are now at that length
+offsets done rn on computer instead of mcontroller, despite controler being almost optimal for offsets to live on
+fixed some major bugs in the motorcontroller interpolation code, the interp calcs were completely wrong but the error adjustment was pulling its weight correcting for this
+contemplated where the motionplanner should live, computerside or microcontroller side, in addition to interpolation methods for mcontroller 
+^^^settled on motion planner computer side as id want to be able to change the planner methods computer side, and hermite spline integration for longer movement paths.
+^^^also changed to an on-the-fly interpolation calculator, getting rid of the sampleerror offsetter and banking on a ton more sample steps.
+aligned table with frame and established table measurements and paddle measurements for the IK
+have some videos of movements going spectacularly wrong, still not sure why but it is fixed now
+had some errors w/ power sup. 
+
+11/~1: first sucesful IK movements, seeing some slack in lines. changing up motorcontroller code

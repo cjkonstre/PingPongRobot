@@ -25,7 +25,6 @@ public:
         const std::array<std::array<double, 3>, cableDOFS>& anchorOffsetsIn,
         const std::array<double, 3>& refOrientation);
 
-    Eigen::RowVector<double, cableDOFS> cableZeroLens;
     Eigen::Vector3d get_objNormalRef() {return objNormalRef;}
 
     //gets the positions of the obj anchors with reference to origin, same frame as pulleypoints

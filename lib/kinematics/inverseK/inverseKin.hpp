@@ -28,15 +28,18 @@ public:
     Eigen::Vector3d get_objNormalRef() {return objNormalRef;}
 
     //gets the positions of the obj anchors with reference to origin, same frame as pulleypoints
-    Eigen::Matrix<double, 3, cableDOFS> getAnchorPoints(Eigen::Vector3d objPos, Eigen::Vector3d objnormal);
-    Eigen::RowVector<double, cableDOFS> getCableLens(const Eigen::Matrix<double, 3, cableDOFS>& anchorPoints);
+    Eigen::Matrix<double, 3, cableDOFS> getAnchorPoints(Eigen::Vector3d objPos, Eigen::Vector3d objnormal) const;
+    Eigen::Matrix<double, 1, cableDOFS> getCableLens(const Eigen::Matrix<double, 3, cableDOFS>& anchorPoints) const;
 
-
-    Eigen::RowVector<double, cableDOFS> getCableVels(Eigen::Matrix<double, 3, cableDOFS> anchorPoints, Eigen::Vector3d objVel);
+    Eigen::Matrix<double, 1, cableDOFS> getCableVels(Eigen::Matrix<double, 3, cableDOFS> anchorPoints, Eigen::Vector3d objVel) const;
     
     //special bc it does the post procesing of subtracting the cablezeros off
-    MotionStateD<cableDOFS> doIK(Eigen::Vector3d objPos, Eigen::Vector3d objnormal, Eigen::Vector3d objVel);
-    MotionStateD<cableDOFS> doIK(std::initializer_list<double> objPos,std::initializer_list<double> objNormal,std::initializer_list<double> objVel);
+    MotionStateD<cableDOFS> doIK(Eigen::Vector3d objPos, Eigen::Vector3d objnormal, Eigen::Vector3d objVel) const;
+    MotionStateD<cableDOFS> doIK(
+    const std::array<double,3>& objPos,
+    const std::array<double,3>& objNormal,
+    const std::array<double,3>& objVel) const;
+    MotionStateD<cableDOFS> doIK(std::initializer_list<double> objPos,std::initializer_list<double> objNormal,std::initializer_list<double> objVel) const;
 };
 
 #include "kinematics/inverseK/inverseKin.tpp"

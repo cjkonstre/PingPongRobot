@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include "kinematics/inverseK/inverseKin.hpp"
 
 constexpr double operator ""_cm(long double val) {return val/100;}
 constexpr double operator ""_mm(long double val) {return val/1000;}
@@ -35,4 +34,4 @@ constexpr std::array<std::array<double, 3>, 7> paddle_anchorOffsets = {{
     {{74.917_mm, -4._mm, -19.694_mm}},
 }};
 
-constexpr std::array<std::array<double, 3>, 7> pulley_anchorOffsets_refOri = {0, 1, 0};
+constexpr std::array<double, 3> pulley_anchorOffsets_refOri = {0, 1, 0};

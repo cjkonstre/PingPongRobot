@@ -35,7 +35,7 @@ KinematicsSolver<cableDOFS>::KinematicsSolver(
 template <int cableDOFS>
 Eigen::Matrix<double, 3, cableDOFS> 
 KinematicsSolver<cableDOFS>::getAnchorPoints(
-    Eigen::Vector3d objPos, Eigen::Vector3d objnormal) 
+    Eigen::Vector3d objPos, Eigen::Vector3d objnormal) const
 {
     Eigen::Vector3d a = objNormalRef.normalized();
     Eigen::Vector3d b = objnormal.normalized();
@@ -67,18 +67,18 @@ KinematicsSolver<cableDOFS>::getAnchorPoints(
 }
 
 template <int cableDOFS>
-Eigen::RowVector<double, cableDOFS>
+Eigen::Matrix<double, 1, cableDOFS>
 KinematicsSolver<cableDOFS>::getCableLens(
-    const Eigen::Matrix<double, 3, cableDOFS>& anchorPoints)
+    const Eigen::Matrix<double, 3, cableDOFS>& anchorPoints) const
 {
     return (pulleyPoints - anchorPoints).colwise().norm();
 }
 
 //since the object will never be actively rotaitng the anchorpoint velocity is jus tthe object velocity
 template <int cableDOFS>
-Eigen::RowVector<double, cableDOFS>
+Eigen::Matrix<double, 1, cableDOFS>
 KinematicsSolver<cableDOFS>::getCableVels(
-    Eigen::Matrix<double, 3, cableDOFS> anchorPoints, Eigen::Vector3d objVel)
+    Eigen::Matrix<double, 3, cableDOFS> anchorPoints, Eigen::Vector3d objVel) const
 {
     //cable pointing vectors.
     Eigen::Matrix<double, 3, cableDOFS> IcablePointingVecs = (anchorPoints - pulleyPoints).colwise().normalized();
@@ -89,11 +89,11 @@ KinematicsSolver<cableDOFS>::getCableVels(
 template <int cableDOFS>
 MotionStateD<cableDOFS>
 KinematicsSolver<cableDOFS>::doIK(
-    Eigen::Vector3d objPos, Eigen::Vector3d objnormal, Eigen::Vector3d objVel) 
+    Eigen::Vector3d objPos, Eigen::Vector3d objnormal, Eigen::Vector3d objVel) const
 {
     Eigen::Matrix<double, 3, cableDOFS> anchorpoints = getAnchorPoints(objPos, objnormal);
-    Eigen::RowVector<double, cableDOFS> cablelens = getCableLens(anchorpoints);
-    Eigen::RowVector<double, cableDOFS> cablevels = getCableVels(anchorpoints, objVel);
+    Eigen::Matrix<double, 1, cableDOFS> cablelens = getCableLens(anchorpoints);
+    Eigen::Matrix<double, 1, cableDOFS> cablevels = getCableVels(anchorpoints, objVel);
 
     std::array<double, cableDOFS> cablelens_vec, cablevels_vec;
     std::copy(cablelens.data(), cablelens.data() + cablelens.size(), cablelens_vec.begin());
@@ -107,7 +107,7 @@ MotionStateD<cableDOFS>
 KinematicsSolver<cableDOFS>::doIK(
     std::initializer_list<double> objPos,
     std::initializer_list<double> objNormal,
-    std::initializer_list<double> objVel)
+    std::initializer_list<double> objVel) const
 {
     assert(objPos.size() == 3 && objNormal.size() == 3 && objVel.size() == 3);
 
@@ -116,4 +116,18 @@ KinematicsSolver<cableDOFS>::doIK(
     Eigen::Vector3d vel((*objVel.begin()), (*(objVel.begin() + 1)), (*(objVel.begin() + 2)));
 
     return doIK(pos, normal, vel); // delegate to main implementation
+}
+
+template <int cableDOFS>
+MotionStateD<cableDOFS>  
+KinematicsSolver<cableDOFS>::doIK(
+    const std::array<double,3>& objPos,
+    const std::array<double,3>& objNormal,
+    const std::array<double,3>& objVel) const
+{
+    Eigen::Vector3d pos(objPos[0], objPos[1], objPos[2]);
+    Eigen::Vector3d normal(objNormal[0], objNormal[1], objNormal[2]);
+    Eigen::Vector3d vel(objVel[0], objVel[1], objVel[2]);
+
+    return doIK(pos, normal, vel);
 }

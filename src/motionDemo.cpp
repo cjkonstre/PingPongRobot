@@ -2,42 +2,28 @@
 #include <iostream>
 
 #include "kinematics/inverseK/inverseKin.hpp"
-#include "core/measurements/dimensions.h"
-#include "core/config.h"
-#include "core/utils.h"
+#include "measurements/dimensions.h"
+#include "config.h" //where a lot of type aliases live
+#include "utils.h"
 
 Packet actionPacket(Frame action) {
     Packet packet;
-    packet.frames[0] = action; 
-    packet.packetLength=1;
+    packet.frames[0] = action;
+    packet.packetLength = 1;
     return packet;
 }
 
 int main() {
-    std::unique_ptr<MotorController> teensy;
-    try {
-        teensy = std::make_unique<MotorController>("/dev/ttyACM0");
-    } catch (const boost::wrapexcept<boost::system::system_error>&) {
-        teensy = std::make_unique<MotorController>("/dev/ttyACM1");
-    }
+    //instantiate and such
+    MotorController teensy("/dev/ttyACM0");
 
     KinematicsSolver<DOFS> kin = make_kinSolver();
+    std::array<double, DOFS> home_qs = kin.doIK(home_pos, home_ori, {0,0,0}).qs;
 
-    //preset ori
-    Eigen::Vector3d initPos(TABLE_WIDTH/2, TABLE_LENGTH-paddleHeight/2, 4._mm);
-    Eigen::Vector3d initOri(0, 0, 1);
-
-    doHoming_presetPos(*teensy, kin, initPos, initOri, 5._mm)
-
-
-    //not sure if this will work -- not sure if the packet truncation functionaloty will be interrete docrrectly
-    //also be interesting to see how the motorcontroller deals w/ this trncated packet 
-    //  --will it be reversed? will it reverse and end up reading the null frames? or will it reverse just the truncated
-    
-    home_presetPos(*teensy, presetQs);
+    doHoming_presetPos(teensy, home_qs, 5._mm);
  
-    std::array<double, 3> Ipos = {TABLE_WIDTH/2, TABLE_LENGTH-paddleHeight/2, 4._mm};
-    std::array<double, 3> Iori = {0, 0, 1};
+    std::array<double, 3> Ipos = home_pos;
+    std::array<double, 3> Iori = home_ori;
     std::array<double, 3> Tpos = {TABLE_WIDTH/2, TABLE_LENGTH-50._cm, 50._cm};
     std::array<double, 3> Tori = {0, 1, 0};
     const int N_STEPS = 2;
@@ -56,7 +42,7 @@ int main() {
         Frame thisFrame;// &thisFrame = packet.frames[5-frameCount]; //reveersd no clue why
         thisFrame.dt = 4;
         thisFrame.q_new = kin.doIK({pos[0], pos[1], pos[2]}, {ori[0], ori[1], ori[2]}, {0, 0, 0}).qs;
-        teensy->sendPacket(actionPacket(thisFrame));
+        teensy.sendPacket(actionPacket(thisFrame));
         int iuerhi;
         std::cin>>iuerhi;
 
@@ -71,9 +57,9 @@ int main() {
     }
 
     Frame thisFrame;
-    thisFrame.q_new = presetQs;
+    thisFrame.q_new = home_qs;
     thisFrame.dt=5;
-    teensy->sendPacket(actionPacket(thisFrame));
+    teensy.sendPacket(actionPacket(thisFrame));
 
     //extends 1m and then goes back
     /*Frame thisFrame;

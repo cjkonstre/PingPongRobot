@@ -1,80 +1,45 @@
 cmake_minimum_required(VERSION 3.10.0)
+cmake_policy(SET CMP0079 NEW)
 project(PingPongRobot VERSION 0.1.0 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(UTIL_LIBS matplotlibcpp) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
+set(VISION_LIBS ${OpenCV_LIBS} )#arducam_evk_sdk::arducam_evk_sdk)
+set(KIN_LIBS Threads::Threads Ruckig::Ruckig Eigen3::Eigen Boost::system)
 
 # ===== Dependencies =====
 find_package(OpenCV REQUIRED)
 find_package(Boost 1.66 REQUIRED COMPONENTS system)
 find_package(Threads REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(Ruckig REQUIRED)
 
+if(NOT TARGET Ruckig::Ruckig)
+    add_library(Ruckig::Ruckig SHARED IMPORTED)
+    set_target_properties(Ruckig::Ruckig PROPERTIES
+        IMPORTED_LOCATION "/usr/local/lib/libruckig.so"
+        INTERFACE_INCLUDE_DIRECTORIES "/usr/local/include"
+    )
+endif()
 
-# === Ruckig ===
-# Disable Ruckig’s own examples/tests (we only want the library)
-set(RUCKIG_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(RUCKIG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-
-# Add the Ruckig subdirectory (it has its own CMakeLists.txt)
-add_subdirectory(${CMAKE_SOURCE_DIR}/lib/kinematics/ruckig)
-
-# If your compiler doesn't support <format>, force Ruckig to use {fmt}
-# (Ruckig’s CMake will detect std::format if available, but this override is safe)
-#find_package(fmt REQUIRED)
-#target_compile_definitions(ruckig PUBLIC RUCKIG_USE_FMTLIB=1)
-#target_link_libraries(ruckig PUBLIC fmt::fmt)
-
-
-# --- Eigen as header-only
-add_library(eigen INTERFACE)
-target_include_directories(eigen INTERFACE
-    ${CMAKE_SOURCE_DIR}/lib/kinematics/eigen-3.4.0
-)
-
-# ImGui
-#add_library(imgui STATIC
-#    lib/utils/imgui/imgui.cpp
-#    lib/utils/imgui/imgui_draw.cpp
-#    lib/utils/imgui/imgui_tables.cpp
-#    lib/utils/imgui/imgui_widgets.cpp
-#    lib/utils/imgui/backends/imgui_impl_glfw.cpp
-#    lib/utils/imgui/backends/imgui_impl_opengl3.cpp
-#)
-#target_include_directories(imgui PUBLIC
-#    ${CMAKE_SOURCE_DIR}/lib/utils/imgui
-#    ${CMAKE_SOURCE_DIR}/lib/utils/imgui/backends
-#)
-
-# ImPlot
-#add_library(implot STATIC
-#    lib/utils/implot/implot.cpp
-#    lib/utils/implot/implot_items.cpp
-#)
-#target_include_directories(implot PUBLIC
-#    ${CMAKE_SOURCE_DIR}/lib/utils/implot
-#)
-#target_link_libraries(implot PUBLIC imgui)
-
-#find_package(OpenGL REQUIRED)
-#find_package(glfw3 REQUIRED)
-
-#target_link_libraries(imgui PUBLIC OpenGL::GL glfw)
-
-#matplotlib
-find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
-
+find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED) #matplotlib
 add_library(matplotlibcpp INTERFACE)
 target_include_directories(matplotlibcpp INTERFACE /usr/local/include/matplotlib-cpp)
 target_link_libraries(matplotlibcpp INTERFACE Python3::Python Python3::NumPy)
 
-#arducam
-#find_package(arducam_evk_sdk REQUIRED)
+# --- Core as interface (no compiled object) ---
+add_library(core INTERFACE)
+target_include_directories(core INTERFACE ${CMAKE_SOURCE_DIR}/core)
+target_link_libraries(core INTERFACE ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS})
 
-# --- Common include dirs (for OpenCV)
-include_directories(${OpenCV_INCLUDE_DIRS},
-                    ${CMAKE_SOURCE_DIR}/lib)
+file(GLOB_RECURSE LIB_SOURCES "${CMAKE_SOURCE_DIR}/lib/*.cpp")
+add_library(robotlibs STATIC ${LIB_SOURCES})
+target_include_directories(robotlibs PUBLIC ${CMAKE_SOURCE_DIR}/lib)
+target_link_libraries(robotlibs PUBLIC Eigen3::Eigen Ruckig::Ruckig Boost::system Threads::Threads)
 
 # --- Put all executables in build/bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -97,35 +62,30 @@ function(add_execs DIR)
   endforeach()
 endfunction()
 
-# Utils (plotting, etc.)
-set(UTIL_LIBS matplotlibcpp) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
-set(VISION_LIBS ${OpenCV_LIBS} )#arducam_evk_sdk::arducam_evk_sdk)
-set(KIN_LIBS Threads::Threads ruckig eigen Boost::system)
-
 # ===== Executables =====
 
 # Everything in src/ with Ruckig + Eigen + OpenCV
 add_execs("${CMAKE_SOURCE_DIR}/src"
   PREFIX ""
-  LIBS ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
+  LIBS robotlibs core ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
 )
 
 # Everything in tools/ with Ruckig + Eigen + OpenCV
 add_execs("${CMAKE_SOURCE_DIR}/tools"
   PREFIX ""
-  LIBS ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
+  LIBS robotlibs core ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
 )
 
 #tets
 
 add_execs("${CMAKE_SOURCE_DIR}/tests/kinematics"
   PREFIX "test_"
-  LIBS ${UTIL_LIBS} ${KIN_LIBS} pthread
+  LIBS robotlibs ${UTIL_LIBS} ${KIN_LIBS} pthread
 )
 
 add_execs("${CMAKE_SOURCE_DIR}/tests/vision"
   PREFIX "test_"
-  LIBS ${UTIL_LIBS} ${VISION_LIBS}
+  LIBS robotlibs ${UTIL_LIBS} ${VISION_LIBS}
 )
 
 # ===== Testing =====

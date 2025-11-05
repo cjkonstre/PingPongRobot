@@ -1,0 +1,4 @@
+ruckig and eigen now live upstairs system-wide.
+
+this lib is for kinematics/movement related things that are general enough to warrant a spot in /lib.
+inverkekin and sccomms are good examples of this. sccomms/motorcontroller rn is not

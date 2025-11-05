@@ -7,17 +7,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(UTIL_LIBS matplotlibcpp) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
-set(VISION_LIBS ${OpenCV_LIBS} )#arducam_evk_sdk::arducam_evk_sdk)
-set(KIN_LIBS Threads::Threads Ruckig::Ruckig Eigen3::Eigen Boost::system)
-
 # ===== Dependencies =====
 find_package(OpenCV REQUIRED)
 find_package(Boost 1.66 REQUIRED COMPONENTS system)
 find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
+# Ensure Eigen headers are available system-wide
+if(TARGET Eigen3::Eigen)
+    get_target_property(_eigen_inc Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+    if(NOT _eigen_inc)
+        # On some systems Eigen3::Eigen has no include dirs; add manually
+        message(STATUS "Manually adding Eigen include path: ${EIGEN3_INCLUDE_DIRS}")
+        target_include_directories(core INTERFACE ${EIGEN3_INCLUDE_DIRS})
+        target_include_directories(robotlibs PUBLIC ${EIGEN3_INCLUDE_DIRS})
+    endif()
+else()
+    include_directories(${EIGEN3_INCLUDE_DIRS})
+endif()
 find_package(Ruckig REQUIRED)
-
 if(NOT TARGET Ruckig::Ruckig)
     add_library(Ruckig::Ruckig SHARED IMPORTED)
     set_target_properties(Ruckig::Ruckig PROPERTIES
@@ -31,17 +38,25 @@ add_library(matplotlibcpp INTERFACE)
 target_include_directories(matplotlibcpp INTERFACE /usr/local/include/matplotlib-cpp)
 target_link_libraries(matplotlibcpp INTERFACE Python3::Python Python3::NumPy)
 
-# --- Core as interface (no compiled object) ---
-add_library(core INTERFACE)
-target_include_directories(core INTERFACE ${CMAKE_SOURCE_DIR}/core)
-target_link_libraries(core INTERFACE ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS})
+#lib vars
+set(UTIL_LIBS matplotlibcpp) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
+set(VISION_LIBS ${OpenCV_LIBS} )#arducam_evk_sdk::arducam_evk_sdk)
+set(KIN_LIBS Threads::Threads Ruckig::Ruckig Eigen3::Eigen Boost::system)
 
+# ===== Libraries =====
 file(GLOB_RECURSE LIB_SOURCES "${CMAKE_SOURCE_DIR}/lib/*.cpp")
 add_library(robotlibs STATIC ${LIB_SOURCES})
 target_include_directories(robotlibs PUBLIC ${CMAKE_SOURCE_DIR}/lib)
 target_link_libraries(robotlibs PUBLIC Eigen3::Eigen Ruckig::Ruckig Boost::system Threads::Threads)
 
-# --- Put all executables in build/bin
+file(GLOB_RECURSE CORE_SOURCES "${CMAKE_SOURCE_DIR}/core/*.cpp")
+add_library(core STATIC ${CORE_SOURCES})
+target_include_directories(core PUBLIC ${CMAKE_SOURCE_DIR}/core)
+target_link_libraries(core PUBLIC robotlibs ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS})
+
+
+
+# EXECS
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ===== Helper function =====

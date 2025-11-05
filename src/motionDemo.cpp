@@ -13,14 +13,23 @@ Packet actionPacket(Frame action) {
     return packet;
 }
 
-int main() {
+int main() { 
+
     //instantiate and such
-    MotorController teensy("/dev/ttyACM0");
+    std::unique_ptr<MotorController> teensy;
+    try {
+        std::cout << "Trying connection at /dev/ttyACM0...\n";
+        teensy = std::make_unique<MotorController>("/dev/ttyACM0");
+    } catch (const boost::wrapexcept<boost::system::system_error>&) {
+        std::cout << "Trying connection at /dev/ttyACM1...\n";
+        teensy = std::make_unique<MotorController>("/dev/ttyACM1");
+    }
+    std::cout << "Connected\n";
 
     KinematicsSolver<DOFS> kin = make_kinSolver();
     std::array<double, DOFS> home_qs = kin.doIK(home_pos, home_ori, {0,0,0}).qs;
 
-    doHoming_presetPos(teensy, home_qs, 5._mm);
+    doHoming_presetPos(*teensy, home_qs, 5._mm);
  
     std::array<double, 3> Ipos = home_pos;
     std::array<double, 3> Iori = home_ori;
@@ -42,7 +51,7 @@ int main() {
         Frame thisFrame;// &thisFrame = packet.frames[5-frameCount]; //reveersd no clue why
         thisFrame.dt = 4;
         thisFrame.q_new = kin.doIK({pos[0], pos[1], pos[2]}, {ori[0], ori[1], ori[2]}, {0, 0, 0}).qs;
-        teensy.sendPacket(actionPacket(thisFrame));
+        teensy->sendPacket(actionPacket(thisFrame));
         int iuerhi;
         std::cin>>iuerhi;
 
@@ -59,7 +68,7 @@ int main() {
     Frame thisFrame;
     thisFrame.q_new = home_qs;
     thisFrame.dt=5;
-    teensy.sendPacket(actionPacket(thisFrame));
+    teensy->sendPacket(actionPacket(thisFrame));
 
     //extends 1m and then goes back
     /*Frame thisFrame;

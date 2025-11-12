@@ -18,5 +18,6 @@ using Packet = MotionPacketD<DOFS, PACKET_FRAME_N>;
 
 using MotorController = MotorControllerD<DOFS, Packet>;
 
-constexpr std::array<double, 3> home_pos = {TABLE_WIDTH/2, TABLE_LENGTH-PADDLE_HEIGHT/2, 4._mm};
+//constexpr std::array<double, 3> home_pos = {TABLE_WIDTH/2, TABLE_LENGTH-PADDLE_HEIGHT/2, 8._mm};
+constexpr std::array<double, 3> home_pos = {TABLE_WIDTH/2, PADDLE_HEIGHT/2, 8._mm};
 constexpr std::array<double, 3> home_ori = {0, 0, 1};

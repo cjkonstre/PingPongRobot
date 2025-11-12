@@ -13,9 +13,6 @@ class MotorControllerD {
 private:
     boost::asio::io_service io;
     boost::asio::serial_port port;
-    std::array<double, DOFS> motorOffsets = {0}; // subtracts these
-
-    Packet preprocessPacket(Packet packet);
 
 public:
     MotorControllerD(const char* device);
@@ -23,7 +20,7 @@ public:
 
     std::size_t sendPacket(Packet packet);
 
-    void setOffset(int motori, double offset);
+    void setCurrentState(std::array<double, DOFS> qs, std::array<double, DOFS> dqs);
 
     void sendCommand(uint8_t command, uint8_t arg);
 };

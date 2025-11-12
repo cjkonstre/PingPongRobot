@@ -24,14 +24,21 @@ constexpr std::array<std::array<double, 3>, 7> frame_pulleyPoss = {{
 
 //w/ ref to paddle facing forward
 #define PADDLE_HEIGHT 157.49_mm
+#define PADDLE_ANC_TOPCENTER {{0, -4._mm, PADDLE_HEIGHT/2}}
+#define PADDLE_ANC_TOPRIGHT {{59.887_mm, -4._mm, 47.225_mm}}
+#define PADDLE_ANC_TOPLEFT {{-59.887_mm, -4._mm, 47.225_mm}}
+#define PADDLE_ANC_MIDLEFT {{-74.917_mm, -4._mm, -19.694_mm}}
+#define PADDLE_ANC_MIDRIGHT {{74.917_mm, -4._mm, -19.694_mm}}
+#define PADDLE_ANC_BOTTOMRIGHT {{42.352_mm, -4._mm, -PADDLE_HEIGHT/2}}
+#define PADDLE_ANC_BOTTOMLEFT {{-42.352_mm, -4._mm, -PADDLE_HEIGHT/2}}
 constexpr std::array<std::array<double, 3>, 7> paddle_anchorOffsets = {{
-    {{59.887_mm, -4._mm, 47.225_mm}},
-    {{42.352_mm, -4._mm, -78.264_mm}},
-    {{-74.917_mm, -4._mm, -19.694_mm}},
-    {{0, -4._mm, PADDLE_HEIGHT/2}},
-    {{-42.352_mm, -4._mm, -78.264_mm}},
-    {{-59.887_mm, -4._mm, 47.225_mm}},
-    {{74.917_mm, -4._mm, -19.694_mm}},
+    PADDLE_ANC_TOPRIGHT,
+    PADDLE_ANC_BOTTOMRIGHT,
+    PADDLE_ANC_MIDLEFT,
+    PADDLE_ANC_TOPCENTER,
+    PADDLE_ANC_TOPLEFT,
+    PADDLE_ANC_BOTTOMLEFT,
+    PADDLE_ANC_MIDRIGHT,
 }};
 
 constexpr std::array<double, 3> pulley_anchorOffsets_refOri = {0, 1, 0};

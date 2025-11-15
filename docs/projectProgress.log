@@ -66,3 +66,8 @@ have some videos of movements going spectacularly wrong, still not sure why but 
 had some errors w/ power sup. 
 
 11/~1: first sucesful IK movements, seeing some slack in lines. changing up motorcontroller code
+11/<14 did some IK movements, was seeing some slack and weird stuff, but now looking very good
+upgrading power supp from a less than 500W to 1200W, can now run motors at 3-3.5A @48v. bc of all this power added a better 
+  swtich and emergency stop, though wires may be a bit small. feel much better now
+
+11/14 writing motion pathign code

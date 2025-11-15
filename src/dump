@@ -3,7 +3,6 @@
 
 using namespace ruckig;
 
-
 Ruckig<3> ruck {0.001}; //# DoFs; control cycle [s]
 InputParameter<3> input;
 OutputParameter<3> output;

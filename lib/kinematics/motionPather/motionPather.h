@@ -27,8 +27,10 @@ private:
     ruckig::Ruckig<DOFS> otg;
     ruckig::OutputParameter<DOFS> output;
 
+    std::array<double, DOFS> idlePos;
+
 public:
-enum IDLE_CONDITION {GO_IDLEPOS, STOP};
+    enum IDLE_CONDITION {GO_IDLEPOS, STOP};
 
     ruckig::InputParameter<DOFS> input;
     IDLE_CONDITION idle_condition;
@@ -38,4 +40,7 @@ enum IDLE_CONDITION {GO_IDLEPOS, STOP};
         const std::array<double, DOFS> idlePos, MC& mc, KS& kin);
 
     void setTarget(const std::array<double, DOFS>& target_qs, const std::array<double, DOFS>& target_dqs);
+
+    void begin(); //starts and allows movement
+    void stop();  //stops movements
 };

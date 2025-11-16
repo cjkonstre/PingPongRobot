@@ -1,7 +1,10 @@
+//unchanging dimensions
+
 #pragma once
 
 #include <array>
 
+constexpr double operator ""_m(long double val) {return val;}
 constexpr double operator ""_cm(long double val) {return val/100;}
 constexpr double operator ""_mm(long double val) {return val/1000;}
 constexpr double operator ""_ft(long double val) {return val*0.3048;}

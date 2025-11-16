@@ -7,7 +7,7 @@
 template <int DOFS, typename Packet>
 MotorControllerD<DOFS, Packet>::MotorControllerD(const char* device)
     : port(io, device) {
-    port.set_option(boost::asio::serial_port_base::baud_rate(115200));
+    port.set_option(boost::asio::serial_port_base::baud_rate(2000000));
 }
 
 template <int DOFS, typename Packet>

@@ -49,6 +49,7 @@ int main() {
     std::vector<std::vector<vec2>> posslist;
 
 
+    
     while (ruckig.update(input, output) == Result::Working) {
         //std::cout << output.time << " | " << output.new_position[0] << std::endl;
         output.pass_to_input(input);

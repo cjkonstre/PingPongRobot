@@ -71,3 +71,7 @@ upgrading power supp from a less than 500W to 1200W, can now run motors at 3-3.5
   swtich and emergency stop, though wires may be a bit small. feel much better now
 
 11/14 writing motion pathign code
+
+11/15 movement with ruckig looking very good. some strange issues. 
+resolved spastic/noisy movement that sometimes pccurs -- wasnt grounded properly
+expirementing with speeds and 'knocking', sounds a bit like motors are skipping. resolves by raising the control cycle time

@@ -95,3 +95,6 @@ architecture fundementally wont work
 11/28 motors freaking out. thought it was a grounding issue and kinda was, 300mv ground diff so added a mcu psu grounding wired
       pulled out oscilloscope etc. to find issue, turns out i initialized the vels to be sent only after sending them \facepalm
       also some weirdness in the IK that i havent figured out
+
+12/5 busy w/ school, finals
+decided need completey new hardware -- motors w/ encoders. big deal. also, to improve torque up pulley size

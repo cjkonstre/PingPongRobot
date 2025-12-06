@@ -1,0 +1,3 @@
+[submodule "external/ball_tracking"]
+	path = external/ball_tracking
+	url = https://gitlab.tuebingen.mpg.de/sgomez/ball_tracking.git

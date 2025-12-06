@@ -43,5 +43,6 @@ constexpr std::array<std::array<double, 3>, 7> paddle_anchorOffsets = {{
     PADDLE_ANC_BOTTOMLEFT,
     PADDLE_ANC_MIDRIGHT,
 }};
-
 constexpr std::array<double, 3> pulley_anchorOffsets_refOri = {0, 1, 0};
+
+constexpr double pulley_diameter = 14._cm;

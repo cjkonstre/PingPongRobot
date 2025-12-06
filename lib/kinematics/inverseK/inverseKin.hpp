@@ -31,15 +31,22 @@ public:
     Eigen::Matrix<double, 3, cableDOFS> getAnchorPoints(Eigen::Vector3d objPos, Eigen::Vector3d objnormal) const;
     Eigen::Matrix<double, 1, cableDOFS> getCableLens(const Eigen::Matrix<double, 3, cableDOFS>& anchorPoints) const;
 
-    Eigen::Matrix<double, 1, cableDOFS> getCableVels(Eigen::Matrix<double, 3, cableDOFS> anchorPoints, Eigen::Vector3d objVel) const;
+    Eigen::Matrix<double, 1, cableDOFS> getCableVels(
+        const Eigen::Matrix<double, 3, cableDOFS>& anchorPoints,
+        const Eigen::Vector3d& objPos,
+        const Eigen::Vector3d& objNorm,
+        const Eigen::Vector3d& objVel,
+        const Eigen::Vector3d& objNormVel) const;
     
     //special bc it does the post procesing of subtracting the cablezeros off
-    MotionStateD<cableDOFS> doIK(Eigen::Vector3d objPos, Eigen::Vector3d objnormal, Eigen::Vector3d objVel) const;
+    MotionStateD<cableDOFS> doIK(Eigen::Vector3d objPos, Eigen::Vector3d objnormal, Eigen::Vector3d objVel, Eigen::Vector3d objnormVel) const;
     MotionStateD<cableDOFS> doIK(
     const std::array<double,3>& objPos,
     const std::array<double,3>& objNormal,
-    const std::array<double,3>& objVel) const;
-    MotionStateD<cableDOFS> doIK(std::initializer_list<double> objPos,std::initializer_list<double> objNormal,std::initializer_list<double> objVel) const;
+    const std::array<double,3>& objVel,
+    const std::array<double,3>& objnormVel) const;
+    MotionStateD<cableDOFS> doIK(std::initializer_list<double> objPos,std::initializer_list<double> objNormal,std::initializer_list<double> objVel, 
+        std::initializer_list<double> objnormVel) const;
 };
 
 #include "kinematics/inverseK/inverseKin.tpp"

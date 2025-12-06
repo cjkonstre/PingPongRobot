@@ -8,7 +8,7 @@
 #define MOTOR_DISABLE 0b1001
 
 //interface for motorcontroller
-template <int DOFS, typename Packet>
+template <int DOFS, typename VelFrame>
 class MotorControllerD {
 private:
     boost::asio::io_service io;
@@ -18,9 +18,7 @@ public:
     MotorControllerD(const char* device);
     MotorControllerD() = default;
 
-    std::size_t sendPacket(Packet packet);
-
-    void setCurrentState(std::array<double, DOFS> qs, std::array<double, DOFS> dqs);
+    inline std::size_t sendVel(VelFrame frame);
 
     void sendCommand(uint8_t command, uint8_t arg);
 };

@@ -3,29 +3,36 @@
 
 #pragma once
 
-#include "kinematics/SCComms/packet.h"
 #include "measurements/dimensions.h"
+#include "kinematics/SCComms/packet.h"
 #include "kinematics/SCComms/motorController.hpp"
+#include "kinematics/motionPather/motionPather.hpp"
 #include <array>
 
 //config settings
+#define PI 3.14159
 #define DOFS 7
-#define PACKET_FRAME_N 5
+#define CONTROL_CYCLE_us 500. // 500 microseconds. limit seems to be on the computer side. too unreliable at 250us
+constexpr double control_cycle = CONTROL_CYCLE_us/1.e6; //make SURE this aligns with what the mc expects
+
 
 //aliases
-using Frame = MotionFrameD<DOFS>;
-using Packet = MotionPacketD<DOFS, PACKET_FRAME_N>;
-using MotorController = MotorControllerD<DOFS, Packet>;
+using VelFrame = VelFrameD<DOFS>;
+using MotorController = MotorControllerD<DOFS, VelFrame>;
 
-//constant positions
-#define ORI_FORWARD {0, 1, 0}
-#define ORI_UPWARD {0, 0, 1}
+//constant positions. sp mean spherical
+#define ORI_sp_FORWARD {0, 0}
+#define ORI_sp_UPWARD {0, PI/2} 
+
 constexpr std::array<double, 3> home_pos = {TABLE_WIDTH/2, PADDLE_HEIGHT/2, 8._mm};
-constexpr std::array<double, 3> home_ori = ORI_UPWARD;
-constexpr std::array<double, 3> idle_pos = {TABLE_WIDTH/2, 0, 0.4_m};
-constexpr std::array<double, 3> idle_ori = ORI_FORWARD;
+constexpr std::array<double, 2> home_ori_sp = ORI_sp_UPWARD;
+constexpr Pose home_pose{home_pos, home_ori_sp};
+constexpr std::array<double, 3> idle_pos = {TABLE_WIDTH/2, 50._cm, 0.4_m};
+constexpr std::array<double, 2> idle_ori = ORI_sp_UPWARD;
+constexpr Pose idle_pose{idle_pos, idle_ori};
 
-//speeds
-constexpr std::array<double, 3> spatial_maxVels = {10, 10, 10}; 
-constexpr std::array<double, 3> spatial_maxAccels = {20, 20, 20}; //25 is too much acc for higher speeds, starts to skip. at least @ 1.4A
-constexpr std::array<double, 3> spatial_maxJerks = {400, 400, 400}; 
+//speeds. units in {m, m, m, rad, rad}. speeds for theta and phi arent physical
+constexpr std::array<double, 5> maxVels = {4, 4, 4, 100, 100}; 
+constexpr std::array<double, 5> maxAccels = {40, 40, 40, 100, 100}; //25 is too much acc for higher speeds, starts to skip. at least @ 1.4A
+constexpr std::array<double, 5> maxJerks = {400, 400, 400, 500, 500}; 
+constexpr SpeedsConfig<5> maxSpeeds{maxVels, maxAccels, maxJerks};

@@ -6,6 +6,7 @@
 #include "config.h" //where a lot of type aliases live
 #include "utils.h"
 #include "ruckig/ruckig.hpp"
+#include "kinematics/motionPather/motionPather.hpp"
 
 static inline std::array<double,3> lerp_array(const std::array<double,3>& a,
                                               const std::array<double,3>& b,
@@ -17,83 +18,61 @@ static inline std::array<double,3> lerp_array(const std::array<double,3>& a,
     };
 }
 
-// Direction vector normalized
-static inline std::array<double,3> direction_vec(const std::array<double,3>& from,
-                                                 const std::array<double,3>& to) {
-    std::array<double,3> dir = { to[0]-from[0], to[1]-from[1], to[2]-from[2] };
-    double norm = std::sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
-    if (norm > 1e-9)
-        for (double& v : dir) v /= norm;
-    return dir;
-}
-
-// Main function
-void sendInterp(MotorController& mc,
-                const KinematicsSolver<DOFS>& kin,
-                const std::array<double,3>& cur_pos, const std::array<double,3>& cur_ori,
-                const std::array<double,3>& target_pos, const std::array<double,3>& target_ori,
-                double totalTime, int steps){
-    Packet packet;
-    packet.packetId = 1; // assign non-zero id
-
-    const double dt = totalTime / steps;
-    const std::array<double,3> travel_dir = direction_vec(cur_pos, target_pos);
-    const double total_dist = std::sqrt(
-        std::pow(target_pos[0]-cur_pos[0],2) +
-        std::pow(target_pos[1]-cur_pos[1],2) +
-        std::pow(target_pos[2]-cur_pos[2],2)
-    );
-    const double avg_speed = total_dist / totalTime; // scalar speed
-
-    int frame_in_packet = 0;
-
-    for (int i = 0; i < steps; ++i) {
-        const double alpha = static_cast<double>(i+1) / steps;
-
-        // interpolate position and orientation
-        std::array<double,3> interp_pos = lerp_array(cur_pos, target_pos, alpha);
-        std::array<double,3> interp_ori = lerp_array(cur_ori, target_ori, alpha);
-
-        // velocity: directed motion, zero at last frame
-        std::array<double,3> vel = {0,0,0};
-        if (i < steps - 1) {
-            for (int j=0; j<3; ++j)
-                vel[j] = travel_dir[j] * avg_speed;
-        }
-
-        MotionStateD<DOFS> ikResult = kin.doIK(interp_pos, interp_ori, vel);
-
-        Frame frame;
-        frame.dt       = dt;
-        frame.q_new    = ikResult.qs;
-        frame.dq_new   = ikResult.dqs;
-        frame.frameIdx = i;
-
-        // add frame to packet
-        packet.frames[frame_in_packet++] = frame;
-
-        // send packet when full
-        if (frame_in_packet == 5) {
-            mc.sendPacket(packet);
-            frame_in_packet = 0;
-            packet = Packet(); // reset packet
-            packet.packetId = 1;
-        }
-    }
-
-    // send remaining frames (if any)
-    if (frame_in_packet > 0) {
-        packet.packetLength = frame_in_packet;
-        mc.sendPacket(packet);
-    }
-}
-
 std::array<double, 3> randVector(std::array<double, 3> mins, std::array<double, 3> maxs) {
     std::array<double, 3> vect;
     for (int i=0; i<3; i++){
         vect[i] = mins[i] + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(maxs[i]-mins[i])));
     }
     return vect;
+}
+
+std::array<double, 3> orisp_to_normal(std::array<double, 2> orisp) {
+    double sin_theta = sin(orisp[0]);
+    double cos_theta = cos(orisp[0]);
+    double sin_phi = sin(orisp[1]);
+    double cos_phi = cos(orisp[1]);
+
+    std::array<double, 3> normal = {sin_theta*cos_phi, 
+                                    cos_theta*cos_phi, 
+                                    sin_phi};
+
+
+    return normal;
+}
+
+#include "matplotlibcpp.h"
+namespace plt = matplotlibcpp;
+
+void plot3D(const Eigen::Matrix<double, 3, 7>& P) {
+    std::vector<double> xs, ys, zs;
+
+    for (int i = 0; i < 7; ++i) {
+        xs.push_back(P(0, i));
+        ys.push_back(P(1, i));
+        zs.push_back(P(2, i));
+    }
+
+    std::vector<double> tx = {0, TABLE_WIDTH,  TABLE_WIDTH,  0, 0};
+    std::vector<double> ty = {0, 0,            TABLE_LENGTH, TABLE_LENGTH, 0};
+    std::vector<double> tz = {0, 0, 0, 0, 0};
+
+    plt::figure();
+
+    xs.insert(xs.end(), tx.begin(), tx.end());
+    ys.insert(ys.end(), ty.begin(), ty.end());
+    zs.insert(zs.end(), tz.begin(), tz.end());
+
+    plt::scatter(xs, ys, zs, 30.0);
+
+    plt::xlabel("X-axis");
+    plt::ylabel("Y-axis");
+    plt::set_zlabel("Z-axis");
+
+    plt::show();
+}
+
+inline Eigen::Vector3d toEigenVec(const std::array<double, 3>& arr) {
+    return Eigen::Vector3d(arr[0], arr[1], arr[2]);
 }
 
 int main() { 
@@ -107,145 +86,38 @@ int main() {
     } std::cout << "Connected\n";
 
     KinematicsSolver<DOFS> kin = make_kinSolver();
+    std::array<double, DOFS> home_qs = kin.doIK(home_pos, orisp_to_normal(home_ori_sp), {0,0,0}, {0,0,0}).qs;
+    doHoming_presetPos(*teensy, home_qs);
 
-    std::array<double, DOFS> home_qs = kin.doIK(home_pos, home_ori, {0,0,0}).qs;
-    doHoming_presetPos(*teensy, home_qs, 0._mm);
-    waitInput("enter to begin");
+    MotionPather<MotorController, KinematicsSolver<DOFS>> mp(
+        control_cycle, maxSpeeds,
+        idle_pose, home_pose,
+        1/(PI*pulley_diameter),
+        *teensy, kin
+    );
 
     /* --start code-- */
+    waitInput("begin");
 
-    using namespace ruckig;
+    Pose target; 
+    target.pos = {home_pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pos[2]+50._cm};
+    target.ori = {0, 0};
+    mp.setTarget(target,  {0, 0, 0});
+    //plot3D(kin.getAnchorPoints(toEigenVec(target.pos), toEigenVec(orisp_to_normal(target.ori))));
 
-    double controlCycle = 0.005; //s
-    Ruckig<3> otg {controlCycle}; //control cycle in s
-    InputParameter<3> input;
-    OutputParameter<3> output;
-    std::array<double, 3> current_ori;
-    std::array<double, 3> target_ori;
+    mp.begin(); //idlepos by default once started
 
-    input.current_position = home_pos;
-    current_ori = home_ori;
-    input.current_velocity = {0, 0, 0};
-    input.current_acceleration = {0, 0, 0};
+    //waitInput("turn");
+    //target.ori = {PI/4, 0};
+    //mp.setTarget(target,  {0, 0, 0});
+    //plot3D(kin.getAnchorPoints(toEigenVec(target.pos), toEigenVec(orisp_to_normal(target.ori))));
 
-    input.max_velocity = spatial_maxVels;
-    input.max_acceleration = spatial_maxAccels;
-    input.max_jerk = spatial_maxJerks;
-
-    input.target_position = {TABLE_WIDTH, TABLE_LENGTH - 50._cm, 50._cm};
-    target_ori = ORI_FORWARD;
-    input.target_velocity = {0, 0, 0};
-
-    int frameN = 0;
-    Packet packet;
-    packet.packetId = 1; //assign non-zero id
-
-    auto next_tick = std::chrono::steady_clock::now();
-    const auto packet_period = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(PACKET_FRAME_N * controlCycle));
-    double totalDuration;
-    double currentT = 0;
-
-    Result result = Result::Working;  
-    while (result != Result::Finished) {
-        next_tick += packet_period;
-  
-        Packet packet{};
-        packet.packetId = 1;     
-        packet.packetLength = 0;
-
-        for (int frameN = 0; frameN < PACKET_FRAME_N; ++frameN) {
-            result = otg.update(input, output); // uses controlCycle from ctor
-            totalDuration = output.trajectory.get_duration();
-            output.pass_to_input(input);
-
-            std::cout << "be there in "<< totalDuration-currentT << "\n";
-
-            Frame& thisFrame = packet.frames[frameN];
-            thisFrame.dt = controlCycle;
-
-            MotionStateD<DOFS> ikResult = kin.doIK(
-                output.new_position,
-                lerp_array(current_ori, target_ori, currentT / totalDuration),
-                output.new_velocity
-            );
-            thisFrame.q_new  = ikResult.qs;
-            thisFrame.dq_new = ikResult.dqs;
-
-            packet.packetLength++; 
-            currentT += controlCycle;
-
-            if (result == Result::Finished) {
-                // stop filling more frames this packet
-                input.target_position = randVector({0, 0, PADDLE_HEIGHT/2+4._mm}, {TABLE_WIDTH, TABLE_LENGTH-50._cm, 0.7_m});
-                input.target_velocity = randVector({-0.5, -0.5, -0.5}, {0.5, 0.5, 0.5});
-                //result = Result::Working;
-                break;
-            }
-        }
-
-        teensy->sendPacket(packet);
-
-        // Wait until the target time for this packet
-        std::this_thread::sleep_until(next_tick);
-    }
-    //random manual interp
-    /*
-    double T = 5;
-    int interpN=6;
-
-    double height_max = 0.7;
-    double height_min = PADDLE_HEIGHT/2 + 4._mm;
-
-    for (int j=0; j<10; j++) {
-        Tpos[0] = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX/TABLE_WIDTH));
-        Tpos[1] = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX/TABLE_LENGTH));
-        Tpos[2] = height_min + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(height_max-height_min)));\
-
-        sendInterp(*teensy, kin,
-                Cpos, Cori,
-                Tpos, Tori,
-                T, interpN);
-        sleep(T);
-        Cpos=Tpos;
-        Cori=Tori;
-        //int in;
-        //std::cin>>in;
-        //if (in==1) {break;}
-    }
-
-*/
-
-    /*//right side of table
-    Tpos={TABLE_WIDTH, TABLE_LENGTH-50._cm, 50._cm};
-    Tori={0,1,0};
-    sendInterp(*teensy, kin,
-                Cpos, Cori,
-                Tpos, Tori,
-                T, interpN);
-    sleep(T);
-    Cpos=Tpos;
-    Cori=Tori;
-    waitInput();
-
-
-    //;eft side of table
-    Tpos={0, TABLE_LENGTH-50._cm, 50._cm};
-    Tori={0,1,0};
-    sendInterp(*teensy, kin,
-                Cpos, Cori,
-                Tpos, Tori,
-                T, interpN);
-    sleep(T);
-    Cpos=Tpos;
-    Cori=Tori;
-    waitInput();*/
-
-    //home
     waitInput("home");
-    sendInterp(*teensy, kin,
-                {TABLE_WIDTH, TABLE_LENGTH - 50._cm, 50._cm}, ORI_FORWARD,
-                home_pos, home_ori,
-                5, 10);
+    mp.setTarget(home_pose, {0, 0, 0});
+    sleep(3);
 
+    mp.stop();
+    VelFrameD<7> endframe; endframe.index=1; endframe.vels.fill(0.);
+    teensy->sendVel(endframe);
     return 0;
 }

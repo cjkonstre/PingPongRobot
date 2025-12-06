@@ -75,3 +75,23 @@ upgrading power supp from a less than 500W to 1200W, can now run motors at 3-3.5
 11/15 movement with ruckig looking very good. some strange issues. 
 resolved spastic/noisy movement that sometimes pccurs -- wasnt grounded properly
 expirementing with speeds and 'knocking', sounds a bit like motors are skipping. resolves by raising the control cycle time
+
+11/16 did some speeds settings, refactored mcu code to hopefully support much faster communications
+before symptoms were that too high could cause jittering and too low could somehow cause loss of tension in the cables
+too high jitter is still an issue after the reworking
+measured MCU ISR timing, seems to be  7.75us +- 0.5 us. am seeing overflows reported. not good
+total frame times seems to be 5220  us +-1 us w/ 5ms control cycle
+total frame times seems to be 50220 us +-1 us w/ 50ms control cycle
+consistant 220us lag in total frame time
+overhead in running executeFrame is consistantly 5-6us
+ovrehead in reading data from serial is in total 4-6us, split evenly between memcpy and loading packet into buffer
+upping the frame interp count lowers the extra lag. the lag seems to the the subinterp interval, ie controlcycle/interpN
+fiddles w/ subinterp timing, now have a constant 19us lag independent of control cycle and subinterp #
+dataread+motorsetting+execframe = 6+6+2 = 14. ~5us coming from other places.
+architecture fundementally wont work
+
+11/21 reworking comms a lot, now mcu only receives velocity updates at a very fast interval. seperate thread for ruckig
+11/26 set up the motion pather and decided on the pather to use spherical coords for movement. also played around w/ prototpng the player code
+11/28 motors freaking out. thought it was a grounding issue and kinda was, 300mv ground diff so added a mcu psu grounding wired
+      pulled out oscilloscope etc. to find issue, turns out i initialized the vels to be sent only after sending them \facepalm
+      also some weirdness in the IK that i havent figured out

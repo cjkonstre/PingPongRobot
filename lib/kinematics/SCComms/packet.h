@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 
+#ifdef COMPILE_LEGACY
 #pragma pack(push, 1)
 //frame, for sending to stepper controller. pretty much just a state+extraneous information. state will be target future state
 template <int DoFs>
@@ -21,5 +22,15 @@ struct MotionPacketD {
     int32_t packetId = 0;
     int32_t packetLength = frameCount; //eq to framecount if it wasnt stopped early
     MotionFrameD<DoFs> frames[frameCount];
+};
+#pragma pack(pop)
+#endif
+//legacy above
+
+#pragma pack(push, 1) //no padding
+template <int DoFs>
+struct VelFrameD {
+    std::array<float, 7> vels;
+    uint32_t index;
 };
 #pragma pack(pop)

@@ -1,20 +1,29 @@
 #include <iostream>
 #include "kinematics/motionPather/motionPather.hpp"
 
+#define START_TIME using std::chrono::high_resolution_clock; \
+                    using std::chrono::duration_cast; \
+                    using std::chrono::duration; \
+                    using std::chrono::milliseconds; \
+                    auto timing_nonameconflict_t1 = high_resolution_clock::now(); \
+
+#define PRINT_TIME auto timing_nonameconflict_t2 = high_resolution_clock::now(); \
+                    auto ms_int = duration_cast<milliseconds>(timing_nonameconflict_t2 - timing_nonameconflict_t1); \
+                    duration<double, std::milli> ms_double = timing_nonameconflict_t2 - timing_nonameconflict_t1; \
+                    std::cout << ms_double.count() * 1000<< "us\n"; \
+
 template <typename MC, typename KS>
 MotionPather<MC, KS>::MotionPather(
         double control_cycle,
         const SpeedsConfig<5>& speeds,
         const Pose& idlePoseIn,
         const Pose& currentPose,
-        double velFactorIn,
         MC& mc,
         KS& kin
 ) : mc(mc), kin(kin),
     otg(control_cycle),
     control_cycle(control_cycle),
-    idlePose(idlePoseIn),
-    velFactor(velFactorIn) {
+    idlePose(idlePoseIn) {
 
     // Configure Ruckig limits
     input.max_velocity     = speeds.max_vel;
@@ -101,6 +110,7 @@ while (running.load(std::memory_order_acquire)) {
     zlst.push_back(input.current_position[2]);
     #endif
 
+    //START_TIME //for timing of the whole IK cycle
     //if these computations are limiting, can switch the IK to use spherical coords
     double theta = input.current_position[3];
     double phi = input.current_position[4];
@@ -121,19 +131,22 @@ while (running.load(std::memory_order_acquire)) {
         Dphi * cos_phi
     };
 
-    std::array<double, 7> vels = kin.doIK(
+    std::array<double, 7> poss = kin.doIK(
         {input.current_position[0], input.current_position[1], input.current_position[2]},
         normal,
         {input.current_velocity[0], input.current_velocity[1], input.current_velocity[2]},
         Dnormal
-    ).dqs;
+    ).qs;
 
-    VelFrameD<7> frame;
+    //PRINT_TIME //for timing of the whole IK cycle
+
+
+    PosFrameD<7> frame;
     frame.index = 1;
-    for (int i = 0; i < 7; i++) {frame.vels[i] = vels[i] * velFactor;}
-    mc.sendVel(frame);
+    for (int i = 0; i < 7; i++) {frame.poss[i] = poss[i];}
+    mc.sendFrame(frame);
 
-    //for (int i = 0; i < 7; i++) {std::cout << frame.vels[i] << ", ";} std::cout << "\n";
+    //for (int i = 0; i < 7; i++) {std::cout << frame.poss[i] << ", ";} std::cout << "\n";
 
     if (result == ruckig::Result::Finished) {
 
@@ -163,14 +176,14 @@ while (running.load(std::memory_order_acquire)) {
         if (pendingTarget.load()) { //if this was a new target
             pendingTarget.store(false);
             setTarget(idlePose, {0, 0, 0});
-        } else { //else, this was getting to idlepos
-            frame.vels.fill(0);
-            while (running.load(std::memory_order_acquire) &&
-                    !pendingTarget.load(std::memory_order_acquire)) {
+        } else { //else, this was getting to idlepos. ON IDLE CONDITION
+            //frames are position now, just keep sending them
+            while (running.load(std::memory_order_acquire) && !pendingTarget.load(std::memory_order_acquire)) {
                 next_tick += waittime;
-                mc.sendVel(frame); //do nothing until new target is given
+                mc.sendFrame(frame); //do nothing until new target is given
                 std::this_thread::sleep_until(next_tick);
             }
+
         }
     }
 

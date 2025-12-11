@@ -98,3 +98,14 @@ architecture fundementally wont work
 
 12/5 busy w/ school, finals
 decided need completey new hardware -- motors w/ encoders. big deal. also, to improve torque up pulley size
+12/6 --thinking about motor control loops and things, possibly wont need them if fix the MCU comms, yet again
+found the source code for the ball tracking algorithm, looked good but turned out its part of a big ecosystem that is a pain, debating whether to code it myself or try to mesh it
+spent a while trying to mesh that. step-precise movement thing, mig.toRotationMatrix();ht transition to a position overide streaming, forget all about velocity, use teensystep and get accurate stuff?
+this would remove need for closed loop systems, bring cost wayy down. this istaking an embarrasing number of iterations
+
+12/10 contacting allied vision for some prosilica camera funding hopefully. doing some ball detection work and trying out methods
+will probably go for gpu accelerated (?) CNN scanning, if too slow throw in some predictive ROI cropping. 
+changed rotation matrix code in IK and the small weird errors are much better now.
+also implemented position based mcu control, so theres a solid potential for few lost steps. 
+looking really great as of now, multiple movements w/o any loss. 
+whole unoptimized IK takes 100-150 us

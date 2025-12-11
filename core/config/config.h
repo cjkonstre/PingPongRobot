@@ -17,8 +17,8 @@ constexpr double control_cycle = CONTROL_CYCLE_us/1.e6; //make SURE this aligns 
 
 
 //aliases
-using VelFrame = VelFrameD<DOFS>;
-using MotorController = MotorControllerD<DOFS, VelFrame>;
+using PosFrame = PosFrameD<DOFS>;
+using MotorController = MotorControllerD<DOFS, PosFrame>;
 
 //constant positions. sp mean spherical
 #define ORI_sp_FORWARD {0, 0}

@@ -3,20 +3,10 @@
 
 #include "kinematics/inverseK/inverseKin.hpp"
 #include "measurements/dimensions.h"
-#include "config.h" //where a lot of type aliases live
+#include "config/config.h" //where a lot of type aliases live
 #include "utils.h"
 #include "ruckig/ruckig.hpp"
 #include "kinematics/motionPather/motionPather.hpp"
-
-static inline std::array<double,3> lerp_array(const std::array<double,3>& a,
-                                              const std::array<double,3>& b,
-                                              double t) {
-    return {
-        a[0] + (b[0] - a[0]) * t,
-        a[1] + (b[1] - a[1]) * t,
-        a[2] + (b[2] - a[2]) * t
-    };
-}
 
 std::array<double, 3> randVector(std::array<double, 3> mins, std::array<double, 3> maxs) {
     std::array<double, 3> vect;
@@ -35,7 +25,6 @@ std::array<double, 3> orisp_to_normal(std::array<double, 2> orisp) {
     std::array<double, 3> normal = {sin_theta*cos_phi, 
                                     cos_theta*cos_phi, 
                                     sin_phi};
-
 
     return normal;
 }
@@ -87,15 +76,15 @@ int main() {
 
     KinematicsSolver<DOFS> kin = make_kinSolver();
     std::array<double, DOFS> home_qs = kin.doIK(home_pos, orisp_to_normal(home_ori_sp), {0,0,0}, {0,0,0}).qs;
-    doHoming_presetPos(*teensy, home_qs);
 
     MotionPather<MotorController, KinematicsSolver<DOFS>> mp(
         control_cycle, maxSpeeds,
         idle_pose, home_pose,
-        1/(PI*pulley_diameter),
         *teensy, kin
     );
 
+    doHoming_presetPos(*teensy, home_qs);
+    
     /* --start code-- */
     waitInput("begin");
 
@@ -107,17 +96,21 @@ int main() {
 
     mp.begin(); //idlepos by default once started
 
-    //waitInput("turn");
-    //target.ori = {PI/4, 0};
-    //mp.setTarget(target,  {0, 0, 0});
-    //plot3D(kin.getAnchorPoints(toEigenVec(target.pos), toEigenVec(orisp_to_normal(target.ori))));
+    for (int i=0; i<5; i++) {
+        waitInput();
+        target.pos = {home_pos[0]-20._cm, TABLE_LENGTH-50._cm, home_pos[2]+50._cm};
+        mp.setTarget(target,  {0, 0, 0});
 
+        waitInput();
+        target.pos = {home_pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pos[2]+50._cm};
+        mp.setTarget(target,  {0, 0, 0});
+    }
+
+    
     waitInput("home");
     mp.setTarget(home_pose, {0, 0, 0});
     sleep(3);
 
     mp.stop();
-    VelFrameD<7> endframe; endframe.index=1; endframe.vels.fill(0.);
-    teensy->sendVel(endframe);
     return 0;
 }

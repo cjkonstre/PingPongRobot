@@ -59,7 +59,6 @@ public:
                  const SpeedsConfig<5>& speeds,
                  const Pose& idlePose,
                  const Pose& currentPose,
-                 double velFactor,
                  MC& mc,
                  KS& kin);
 

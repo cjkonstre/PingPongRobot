@@ -18,6 +18,8 @@ KinematicsSolver<cableDOFS>::KinematicsSolver(
     const std::array<std::array<double, 3>, cableDOFS>& anchorOffsetsIn,
     const std::array<double, 3>& refOrientation):
     objNormalRef(refOrientation.data()) {
+
+    objNormalRef=objNormalRef.normalized();
     for (int i = 0; i < cableDOFS; ++i) {
         pulleyPoints.col(i) = Eigen::Vector3d(
             pulleyPointsIn[i][0],
@@ -37,27 +39,9 @@ Eigen::Matrix<double, 3, cableDOFS>
 KinematicsSolver<cableDOFS>::getAnchorPoints(
     Eigen::Vector3d objPos, Eigen::Vector3d objnormal) const
 {
-    Eigen::Vector3d a = objNormalRef.normalized();
     Eigen::Vector3d b = objnormal.normalized();
 
-    Eigen::Vector3d v = a.cross(b);
-    double s = v.norm();
-    double c = a.dot(b);
-
-    Eigen::Matrix3d vhat = _HatOperator3d(v);
-    Eigen::Matrix3d R;
-
-    if (s < 1e-8) {
-        if (c > 0) {
-            R = Eigen::Matrix3d::Identity();
-        } else {
-            Eigen::Vector3d axis = a.unitOrthogonal();
-            Eigen::Matrix3d axis_hat = _HatOperator3d(axis);
-            R = Eigen::Matrix3d::Identity() + 2 * axis_hat * axis_hat;
-        }
-    } else {
-        R = Eigen::Matrix3d::Identity() + vhat + vhat * vhat * ((1 - c) / (s * s));
-    }
+    Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(objNormalRef, b).toRotationMatrix();
 
     // Rotate anchor offsets and translate
     Eigen::Matrix<double, 3, cableDOFS> anchorpointsprime =
@@ -68,11 +52,9 @@ KinematicsSolver<cableDOFS>::getAnchorPoints(
 
 template <int cableDOFS>
 Eigen::Matrix<double, 1, cableDOFS>
-KinematicsSolver<cableDOFS>::getCableLens(
+inline KinematicsSolver<cableDOFS>::getCableLens(
     const Eigen::Matrix<double, 3, cableDOFS>& anchorPoints) const
-{
-    return (pulleyPoints - anchorPoints).colwise().norm();
-}
+{ return (pulleyPoints - anchorPoints).colwise().norm(); }
 
 template <int cableDOFS>
 Eigen::Matrix<double, 1, cableDOFS>
@@ -83,12 +65,15 @@ KinematicsSolver<cableDOFS>::getCableVels(
     const Eigen::Vector3d& objVel,
     const Eigen::Vector3d& objNormVel) const
 {
+    Eigen::Vector3d n = objNorm.normalized();
+    Eigen::Vector3d ndot = objNormVel - n * (n.dot(objNormVel)); // project perp
+
     // Unit cable direction vectors (from pulley to anchor)
     Eigen::Matrix<double, 3, cableDOFS> IcablePointingVecs = 
         (anchorPoints - pulleyPoints).colwise().normalized();
 
     Eigen::Vector3d omegaVec = //assumes objNormVel is perp to objNorm. can switch to spherical coords in future maybe
-        objNorm.normalized().cross(objNormVel);
+        n.cross(ndot);
 
     Eigen::Matrix<double, 3, cableDOFS> vAnchors = //rotates the nonrotated anchor offsets
         (_HatOperator3d(omegaVec) * (anchorPoints.colwise()-objPos)).colwise() + objVel;

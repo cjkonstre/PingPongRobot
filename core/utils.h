@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config.h"
+#include "config/config.h"
 #include "kinematics/inverseK/inverseKin.hpp"
 #include "measurements/dimensions.h"
 #include <array>

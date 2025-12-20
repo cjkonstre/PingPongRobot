@@ -7,8 +7,8 @@ KinematicsSolver<cableDOFS>::_HatOperator3d(
 {
     Eigen::Matrix3d t_hat;
     t_hat << 0, -t(2), t(1),
-        t(2), 0, -t(0),
-        -t(1), t(0), 0;
+            t(2), 0, -t(0),
+            -t(1), t(0), 0;
     return t_hat;
 }
 
@@ -40,7 +40,6 @@ KinematicsSolver<cableDOFS>::getAnchorPoints(
     Eigen::Vector3d objPos, Eigen::Vector3d objnormal) const
 {
     Eigen::Vector3d b = objnormal.normalized();
-
     Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(objNormalRef, b).toRotationMatrix();
 
     // Rotate anchor offsets and translate

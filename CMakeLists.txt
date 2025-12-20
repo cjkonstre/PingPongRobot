@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.10.0)
 cmake_policy(SET CMP0079 NEW)
 project(PingPongRobot VERSION 0.1.0 LANGUAGES C CXX)
 
+include(FetchContent)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -38,6 +40,13 @@ add_library(matplotlibcpp INTERFACE)
 target_include_directories(matplotlibcpp INTERFACE /usr/local/include/matplotlib-cpp)
 target_link_libraries(matplotlibcpp INTERFACE Python3::Python Python3::NumPy)
 
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG        v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 #lib vars
 set(UTIL_LIBS matplotlibcpp) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
 set(VISION_LIBS ${OpenCV_LIBS} )#arducam_evk_sdk::arducam_evk_sdk)
@@ -52,8 +61,7 @@ target_link_libraries(robotlibs PUBLIC Eigen3::Eigen Ruckig::Ruckig Boost::syste
 file(GLOB_RECURSE CORE_SOURCES "${CMAKE_SOURCE_DIR}/core/*.cpp")
 add_library(core STATIC ${CORE_SOURCES})
 target_include_directories(core PUBLIC ${CMAKE_SOURCE_DIR}/core)
-target_link_libraries(core PUBLIC robotlibs ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS})
-
+target_link_libraries(core PUBLIC robotlibs nlohmann_json::nlohmann_json ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS})
 
 
 # EXECS

@@ -109,3 +109,8 @@ changed rotation matrix code in IK and the small weird errors are much better no
 also implemented position based mcu control, so theres a solid potential for few lost steps. 
 looking really great as of now, multiple movements w/o any loss. 
 whole unoptimized IK takes 100-150 us
+thinking of starting a youtube posting ab this project. not sure how it wll be though, ie updates or overveiws...
+
+12/19 finals week done
+somehting is weirdly inconistant. try reconnecting th eethernet cables
+testing accels: 

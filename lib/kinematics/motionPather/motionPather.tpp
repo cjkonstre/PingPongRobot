@@ -1,5 +1,6 @@
 #include <iostream>
 #include "kinematics/motionPather/motionPather.hpp"
+#include "kinematics/SCComms/packet.h"
 
 #define START_TIME using std::chrono::high_resolution_clock; \
                     using std::chrono::duration_cast; \
@@ -14,16 +15,18 @@
 
 template <typename MC, typename KS>
 MotionPather<MC, KS>::MotionPather(
-        double control_cycle,
+        double control_cycle_us,
         const SpeedsConfig<5>& speeds,
         const Pose& idlePoseIn,
         const Pose& currentPose,
         MC& mc,
         KS& kin
 ) : mc(mc), kin(kin),
-    otg(control_cycle),
-    control_cycle(control_cycle),
+    otg(control_cycle_us/1.e6),
+    control_cycle(control_cycle_us/1.e6),
     idlePose(idlePoseIn) {
+
+
 
     // Configure Ruckig limits
     input.max_velocity     = speeds.max_vel;
@@ -31,7 +34,7 @@ MotionPather<MC, KS>::MotionPather(
     input.max_jerk         = speeds.max_jerk;
 
     // Initial state
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i) { //keep as ++i, breaks if not
         input.current_position[i]   = currentPose.pos[i];
         input.current_position[3+i] = currentPose.ori[i];
 
@@ -88,7 +91,11 @@ auto next_tick = std::chrono::steady_clock::now();
 const auto waittime = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
     std::chrono::duration<double>(control_cycle));
 
-//std::vector<double> xlst, ylst, zlst; //DIAG
+#ifdef DOPATHERDIAGS
+std::array<std::vector<double>, 5> plists; //DIAG
+std::array<std::vector<double>, 5> dplists; //DIAG
+std::vector<double> ts; ts.push_back(0);
+#endif
 
 while (running.load(std::memory_order_acquire)) {
     //check for update target request
@@ -105,10 +112,11 @@ while (running.load(std::memory_order_acquire)) {
     output.pass_to_input(input);
 
     #ifdef DOPATHERDIAGS
-    xlst.push_back(input.current_position[0]); //DIAG
-    ylst.push_back(input.current_position[1]);
-    zlst.push_back(input.current_position[2]);
+    for (int i=0; i<5; i++) {plists[i].push_back(input.current_position[i]);}
+    for (int i=0; i<5; i++) {dplists[i].push_back(input.current_velocity[i]);}
+    ts.push_back(ts.back()+=control_cycle);
     #endif
+
 
     //START_TIME //for timing of the whole IK cycle
     //if these computations are limiting, can switch the IK to use spherical coords
@@ -152,25 +160,34 @@ while (running.load(std::memory_order_acquire)) {
 
         //DIAG
         #ifdef DOPATHERDIAGS
-        std::vector<double> tx = {0, TABLE_WIDTH,  TABLE_WIDTH,  0, 0};
-        std::vector<double> ty = {0, 0,            TABLE_LENGTH, TABLE_LENGTH, 0};
-        std::vector<double> tz = {0, 0, 0, 0, 0};
+        ts.pop_back();
+        plt::figure(1);
+        plt::plot(ts, plists[0], {{"label", "X"}});
+        plt::plot(ts, plists[1], {{"label", "Y"}});
+        plt::plot(ts, plists[2], {{"label", "Z"}});
+        plt::plot(ts, plists[3], {{"label", "Theta"}});
+        plt::plot(ts, plists[4], {{"label", "Phi"}});
 
-        plt::figure();
+        plt::legend();
+        plt::xlabel("s [s]");
+        plt::ylabel("spatial");
 
-        xlst.insert(xlst.end(), tx.begin(), tx.end());
-        ylst.insert(ylst.end(), ty.begin(), ty.end());
-        zlst.insert(zlst.end(), tz.begin(), tz.end());
+        plt::figure(2);
+        plt::plot(ts, dplists[0], {{"label", "dX"}});
+        plt::plot(ts, dplists[1], {{"label", "dY"}});
+        plt::plot(ts, dplists[2], {{"label", "dZ"}});
+        plt::plot(ts, dplists[3], {{"label", "dTheta"}});
+        plt::plot(ts, dplists[4], {{"label", "dPhi"}});
 
-        plt::scatter(xlst, ylst, zlst, 30);
-
-        plt::xlabel("X-axis");
-        plt::ylabel("Y-axis");
-        plt::set_zlabel("Z-axis");
-
+        plt::legend();
+        plt::xlabel("s [s]");
+        plt::ylabel("1st deriv");
         plt::show();
 
-        xlst.clear(); ylst.clear(); zlst.clear(); //DIAG
+        for (int i=0; i<5; i++) {plists[i].clear();}
+        for (int i=0; i<5; i++) {dplists[i].clear();}
+        ts.clear(); ts.push_back(0);
+
         #endif
 
         if (pendingTarget.load()) { //if this was a new target

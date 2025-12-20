@@ -9,8 +9,11 @@
 #include <cmath>
 
 //DIAG
+//#define DOPATHERDIAGS
+#ifdef DOPATHERDIAGS
 #include "matplotlibcpp.h"
 namespace plt = matplotlibcpp;
+#endif
 
 template <int DoFs>
 struct SpeedsConfig {

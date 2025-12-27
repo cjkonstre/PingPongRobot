@@ -14,19 +14,8 @@ find_package(OpenCV REQUIRED)
 find_package(Boost 1.66 REQUIRED COMPONENTS system)
 find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
-# Ensure Eigen headers are available system-wide
-if(TARGET Eigen3::Eigen)
-    get_target_property(_eigen_inc Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
-    if(NOT _eigen_inc)
-        # On some systems Eigen3::Eigen has no include dirs; add manually
-        message(STATUS "Manually adding Eigen include path: ${EIGEN3_INCLUDE_DIRS}")
-        target_include_directories(core INTERFACE ${EIGEN3_INCLUDE_DIRS})
-        target_include_directories(robotlibs PUBLIC ${EIGEN3_INCLUDE_DIRS})
-    endif()
-else()
-    include_directories(${EIGEN3_INCLUDE_DIRS})
-endif()
 find_package(Ruckig REQUIRED)
+find_package(Ceres REQUIRED)
 if(NOT TARGET Ruckig::Ruckig)
     add_library(Ruckig::Ruckig SHARED IMPORTED)
     set_target_properties(Ruckig::Ruckig PROPERTIES
@@ -96,11 +85,10 @@ add_execs("${CMAKE_SOURCE_DIR}/src"
 # Everything in tools/ with Ruckig + Eigen + OpenCV
 add_execs("${CMAKE_SOURCE_DIR}/tools"
   PREFIX ""
-  LIBS robotlibs core ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
+  LIBS robotlibs core Eigen3::Eigen Ceres::ceres ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
 )
 
 #tets
-
 add_execs("${CMAKE_SOURCE_DIR}/tests/kinematics"
   PREFIX "test_"
   LIBS robotlibs ${UTIL_LIBS} ${KIN_LIBS} pthread

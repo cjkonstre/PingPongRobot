@@ -10,6 +10,12 @@ constexpr double operator ""_mm(long double val) {return val/1000;}
 constexpr double operator ""_ft(long double val) {return val*0.3048;}
 constexpr double operator ""_in(long double val) {return val/12*0.3048;}
 
+//units in m
+//relative to table height
+#define TABLE_HEIGHT 29.75_in //roughly
+#define TABLE_WIDTH 5._ft //x, width of table
+#define TABLE_LENGTH 4.5_ft //y, length of half table !!
+
 //w/ ref to paddle facing forward
 #define PADDLE_HEIGHT 157.49_mm
 #define PADDLE_ANC_TOPCENTER {{0, -4._mm, PADDLE_HEIGHT/2}}

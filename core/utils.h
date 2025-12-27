@@ -6,8 +6,6 @@
 #include <array>
 #include <iostream>
 
-KinematicsSolver<DOFS> make_kinSolver();
-
 void waitInput(const char* message);
 void waitInput();
 

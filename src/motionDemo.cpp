@@ -55,9 +55,8 @@ void plot3D(const Eigen::Matrix<double, 3, 7>& P) {
 inline Eigen::Vector3d toEigenVec(const std::array<double, 3>& arr) {return Eigen::Vector3d(arr[0], arr[1], arr[2]);}
 
 int main() { 
-    auto kinConfig = load_configs("/home/connor/PingPongRobot/core/config/kin_conf.json");
+    auto kinConfig = load_configs(KINCONFIG_PATH);
     std::cout << "configs loaded\n";
-
 
     /* --instantiate and such-- */
     std::unique_ptr<MotorController> teensy; try {

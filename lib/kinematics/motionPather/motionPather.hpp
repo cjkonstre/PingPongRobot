@@ -7,6 +7,8 @@
 #include <pthread.h>
 #include <ruckig/ruckig.hpp>
 #include <cmath>
+#include "kinematics/Pose.h"
+#include "kinematics/motionPather/motionScheduler.h"
 
 //DIAG
 //#define DOPATHERDIAGS
@@ -22,11 +24,6 @@ struct SpeedsConfig {
     std::array<double, DoFs> max_jerk;
 };
 
-//ori is spherical rather than normal
-struct Pose {
-    std::array<double, 3> pos;
-    std::array<double, 2> ori; //theta, phi. (0,0) is (1,0,0).
-};
 
 //internally uses 5 DOFS, 3 spatial and 2 for normal angles
 template <typename MC, typename KS>
@@ -54,23 +51,29 @@ private:
     void pin_to_core(int core_id);
     void set_realtime_priority(int priority = 80);
 
+    bool scheduleAttached = false;
+    MotionScheduler schedule;
+    bool gotoIdleOnFinish;
+
 public:
     ruckig::InputParameter<5> input;
     double velFactor;
 
     MotionPather(double control_cycle,
                  const SpeedsConfig<5>& speeds,
-                 const Pose& idlePose,
-                 const Pose& currentPose,
-                 MC& mc,
-                 KS& kin);
+                 const Pose& idlePose, const Pose& currentPose,
+                 MC& mc, KS& kin,
+                 bool gotoIdleOnFinish);
 
     void setTarget(const Pose& target_pose,
-                   const std::array<double, 3>& target_vel, //final rot is assumed 0
+                   const Pose& target_vel, //final rot is assumed 0
                    double min_dur = 0.0);
+    inline void setTarget(const MotionScheduler::Frame& frame);
 
     void begin();
     void stop();
+
+    void attachSchedule(MotionScheduler& sc);
 };
 
 #include "kinematics/motionPather/motionPather.tpp"

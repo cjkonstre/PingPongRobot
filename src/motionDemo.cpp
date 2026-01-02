@@ -1,25 +1,9 @@
-#include <boost/asio.hpp>
 #include <iostream>
 
 #include "kinematics/inverseK/inverseKin.hpp"
-#include "measurements/dimensions.h"
-#include "config/config.h" //where a lot of type aliases live
-#include "utils.h"
-#include "ruckig/ruckig.hpp"
 #include "kinematics/motionPather/motionPather.hpp"
-
-std::array<double, 3> orisp_to_normal(std::array<double, 2> orisp) {
-    double sin_theta = sin(orisp[0]);
-    double cos_theta = cos(orisp[0]);
-    double sin_phi = sin(orisp[1]);
-    double cos_phi = cos(orisp[1]);
-
-    std::array<double, 3> normal = {sin_theta*cos_phi, 
-                                    cos_theta*cos_phi, 
-                                    sin_phi};
-
-    return normal;
-}
+#include "config/config.h"
+#include "utils.h"
 
 #include "matplotlibcpp.h"
 namespace plt = matplotlibcpp;
@@ -54,7 +38,7 @@ void plot3D(const Eigen::Matrix<double, 3, 7>& P) {
 
 inline Eigen::Vector3d toEigenVec(const std::array<double, 3>& arr) {return Eigen::Vector3d(arr[0], arr[1], arr[2]);}
 
-int main() { 
+int main() {
     auto kinConfig = load_configs(KINCONFIG_PATH);
     std::cout << "configs loaded\n";
 
@@ -72,36 +56,50 @@ int main() {
     MotionPather<MotorController, KinematicsSolver<DOFS>> mp(
         kinConfig.control_cycle, kinConfig.speeds,
         idle_pose, home_pose,
-        *teensy, kin
+        *teensy, kin,
+        false
     );
 
-    std::array<double, DOFS> home_qs = kin.doIK(home_pos, orisp_to_normal(home_ori_sp), {0,0,0}, {0,0,0}).qs;
+    std::array<double, DOFS> home_qs = kin.doIK(home_pose.pos, home_pose.ori.n(), {0,0,0}, {0,0,0}).qs;
     doHoming_presetPos(*teensy, home_qs);
     
     /* --start code-- */
     waitInput("begin");
 
     Pose target; 
-    target.pos = {home_pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pos[2]+50._cm};
-    target.ori = {0, 0};
-    mp.setTarget(target,  {0, 0, 0});
+    target.pos = {home_pose.pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pose.pos[2]+50._cm};
+    target.ori = {0, 0}; //bounds of both at [-pi/2, pi/2]
+    mp.setTarget(target,  Pose0vels);
     //plot3D(kin.getAnchorPoints(toEigenVec(target.pos), toEigenVec(orisp_to_normal(target.ori))));
 
-    mp.begin(); //idlepos by default once started
+    mp.begin(); //idlepos by default once started 
 
+    waitInput();
+    target.ori = {0, PI/4}; 
+    mp.setTarget(target, Pose0vels);
+
+    waitInput();
+    target.ori = {0, -PI/4}; 
+    mp.setTarget(target, Pose0vels);
+
+    waitInput();
+    target.ori = {PI/8, -0}; 
+    mp.setTarget(target, Pose0vels);
+
+    waitInput();
+    target.ori = {-PI/8, 0}; 
+    mp.setTarget(target, Pose0vels);
+
+
+    target.ori={0, 0};
     for (int i=0; i<3; i++) {
         waitInput();
         target.pos = randVector({0, 0, PADDLE_HEIGHT}, {TABLE_WIDTH, TABLE_LENGTH, 0.8_m});
-        //target.pos = {home_pos[0]-20._cm, TABLE_LENGTH-50._cm, home_pos[2]+50._cm};
-        mp.setTarget(target,  {0, 0, 0});
-
-        //waitInput();
-        //target.pos = {home_pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pos[2]+50._cm};
-        //mp.setTarget(target,  {0, 0, 0});
+        mp.setTarget(target,  Pose0vels);
     }
     
     waitInput("home");
-    mp.setTarget(home_pose, {0, 0, 0});
+    mp.setTarget(home_pose, Pose0vels);
     sleep(3);
 
     mp.stop();

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "measurements/dimensions.h"
+#include "kinematics/Pose.h"
 #include "kinematics/SCComms/packet.h"
 #include "kinematics/SCComms/motorController.hpp"
 #include "kinematics/motionPather/motionPather.hpp"
@@ -22,9 +23,7 @@ using MotorController = MotorControllerD<DOFS, PosFrame>;
 #define ORI_sp_FORWARD {0, 0}
 #define ORI_sp_UPWARD {0, PI/2} 
 
-constexpr std::array<double, 3> home_pos = {TABLE_WIDTH/2, PADDLE_HEIGHT/2, 8._mm};
-constexpr std::array<double, 2> home_ori_sp = ORI_sp_UPWARD;
-constexpr Pose home_pose{home_pos, home_ori_sp};
-constexpr std::array<double, 3> idle_pos = {TABLE_WIDTH/2, 50._cm, 0.4_m};
-constexpr std::array<double, 2> idle_ori = ORI_sp_UPWARD;
-constexpr Pose idle_pose{idle_pos, idle_ori};
+constexpr Pose home_pose{{TABLE_WIDTH/2, PADDLE_HEIGHT/2, 8._mm}, 
+                         ORI_sp_UPWARD};
+constexpr Pose idle_pose{{TABLE_WIDTH/2, 50._cm, 0.4_m}, 
+                         ORI_sp_FORWARD};

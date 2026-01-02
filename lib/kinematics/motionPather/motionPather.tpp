@@ -2,6 +2,7 @@
 #include "kinematics/motionPather/motionPather.hpp"
 #include "kinematics/SCComms/packet.h"
 
+
 #define START_TIME using std::chrono::high_resolution_clock; \
                     using std::chrono::duration_cast; \
                     using std::chrono::duration; \
@@ -20,27 +21,21 @@ MotionPather<MC, KS>::MotionPather(
         const Pose& idlePoseIn,
         const Pose& currentPose,
         MC& mc,
-        KS& kin
+        KS& kin,
+        bool gotoIdleOnFinish
 ) : mc(mc), kin(kin),
     otg(control_cycle_us/1.e6),
     control_cycle(control_cycle_us/1.e6),
-    idlePose(idlePoseIn) {
-
-
+    idlePose(idlePoseIn),
+    gotoIdleOnFinish(gotoIdleOnFinish) {
 
     // Configure Ruckig limits
     input.max_velocity     = speeds.max_vel;
     input.max_acceleration = speeds.max_acc;
     input.max_jerk         = speeds.max_jerk;
 
-    // Initial state
-    for (int i = 0; i < 3; ++i) { //keep as ++i, breaks if not
-        input.current_position[i]   = currentPose.pos[i];
-        input.current_position[3+i] = currentPose.ori[i];
-
-        input.target_position[i]   = idlePose.pos[i];
-        input.target_position[3+i] = idlePose.ori[i];
-    }
+    input.current_position = currentPose.to5vec();
+    input.target_position = idlePose.to5vec();
 
     input.current_velocity.fill(0.0);
     input.current_acceleration.fill(0.0);
@@ -120,15 +115,11 @@ while (running.load(std::memory_order_acquire)) {
 
     //START_TIME //for timing of the whole IK cycle
     //if these computations are limiting, can switch the IK to use spherical coords
-    double theta = input.current_position[3];
-    double phi = input.current_position[4];
-    double sin_theta = sin(theta);
-    double cos_theta = cos(theta);
-    double sin_phi = sin(phi);
-    double cos_phi = cos(phi);
+    double theta = input.current_position[3]; double phi = input.current_position[4];
+    double sin_theta = sin(theta);  double sin_phi = sin(phi); 
+    double cos_theta = cos(theta); double cos_phi = cos(phi);
 
-    double Dtheta = input.current_velocity[3];
-    double Dphi = input.current_velocity[4];
+    double Dtheta = input.current_velocity[3]; double Dphi = input.current_velocity[4];
 
     std::array<double, 3> normal = {sin_theta*cos_phi,
                                     cos_theta*cos_phi,
@@ -157,7 +148,6 @@ while (running.load(std::memory_order_acquire)) {
     //for (int i = 0; i < 7; i++) {std::cout << frame.poss[i] << ", ";} std::cout << "\n";
 
     if (result == ruckig::Result::Finished) {
-
         //DIAG
         #ifdef DOPATHERDIAGS
         ts.pop_back();
@@ -190,19 +180,22 @@ while (running.load(std::memory_order_acquire)) {
 
         #endif
 
-        if (pendingTarget.load()) { //if this was a new target
-            pendingTarget.store(false);
-            setTarget(idlePose, {0, 0, 0});
-        } else { //else, this was getting to idlepos. ON IDLE CONDITION
+        //if (goingtoIdle) { //if previous target was idle, now were there, just 
             //frames are position now, just keep sending them
-            while (running.load(std::memory_order_acquire) && !pendingTarget.load(std::memory_order_acquire)) {
-                next_tick += waittime;
-                mc.sendFrame(frame); //do nothing until new target is given
-                std::this_thread::sleep_until(next_tick);
-            }
+        //    while (running.load(std::memory_order_acquire) && !pendingTarget.load(std::memory_order_acquire)) {
+        //        next_tick += waittime;
+        //        mc.sendFrame(frame); //do nothing until new target is given
+        //        std::this_thread::sleep_until(next_tick);
+        //    }
+        //}
+
+        if (scheduleAttached && !schedule.isFinished()) {
+            setTarget(schedule.at()); schedule.inc();
+        } else if (gotoIdleOnFinish) {
+            setTarget(idlePose, Pose{{0, 0, 0}, {0, 0}});
+        }
 
         }
-    }
 
     std::this_thread::sleep_until(next_tick); //will have a delay on one control cycle after the idle waiting. 1-5ms reaction delay isnt a huge deal
 }
@@ -212,19 +205,24 @@ while (running.load(std::memory_order_acquire)) {
 template <typename MC, typename KS>
 void MotionPather<MC, KS>::setTarget(
         const Pose& target_pose,
-        const std::array<double, 3>& target_vel,
+        const Pose& target_vels,
         double min_dur) {
 
-    pending_vel.fill(0);
-
-    for (int i = 0; i < 3; ++i) {
-        pending_pose[i]   = target_pose.pos[i];
-        pending_vel[i]=target_vel[i];
-    }
-
-    pending_pose[3] = target_pose.ori[0];
-    pending_pose[4] = target_pose.ori[1];
+    pending_pose = target_pose.to5vec();
+    pending_vel = target_vels.to5vec();
 
     pendingMinDur.store(min_dur, std::memory_order_release);
     pendingTarget.store(true, std::memory_order_release);
+}
+
+template <typename MC, typename KS>
+inline void MotionPather<MC, KS>::setTarget(const MotionScheduler::Frame& frame) {
+    setTarget(frame.spat, frame.vels, frame.minDur);
+}
+
+template <typename MC, typename KS>
+void MotionPather<MC, KS>::attachSchedule(MotionScheduler& sc){
+    scheduleAttached = true;
+    schedule = sc;
+    setTarget(schedule.at());
 }

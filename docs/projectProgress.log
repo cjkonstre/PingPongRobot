@@ -118,3 +118,19 @@ testing accels:
 01/01 kinematics is pretty much done, working spectacularly. did some testing and look like cheap, non industrial cameras are plenty good
 gaussian somehing detection for th eball working great
 added symlinks for cameras connecting, still port limited. 
+got to like ~120 fps at 1280x800, pretty solid. a lot of jitter and sub 120 is rn due to the mjpg unpacking
+--at this speed, it looks like its taking ~16000kb/s, not sure if this is bits, think so =8MB/s.
+if it looks red thats an exposre/white balance issue. seems good for now
+pretty sure im gonna go with a two loop architecture:
+ a data vision+player loop, takes in data and processes it
+ a control loop
+dis bc everthing apart from the control loop relies only on vision/camera information, so
+ updates on player subsystem only ever immediately follow new vision data, making a single thread fine for this.
+also cant rly think of any way in which data not from cameras would be needed. 
+big thing though apart from processing speed is pulling the data from cameras, as if read sequentially the data would not only
+  be offset in time = inaccurate but also the latencies in reading would compound, and for 2 cams the fps would pretty much halve
+  so maybe isolate reading thread(s, not sure if per cam?) from processing loop
+probs gonna run seperate reading thread(s), so those would be core limited to reduce the mjpg jitter
+also now that i will eventually have 3 threads, should probably launch them in a better way.
+
+01/03 looks like the grab retreive methods are good. grab takes ~10us to complete

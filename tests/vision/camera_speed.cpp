@@ -4,11 +4,18 @@
 
 int main() {
     // Open default camera (index 0). Change index if you have multiple cameras.
-    cv::VideoCapture cap(2);
+    cv::VideoCapture cap("/dev/cam_backRight", cv::CAP_V4L2);
     if (!cap.isOpened()) {
         std::cerr << "Error: Could not open camera." << std::endl;
         return -1;
     }
+    cap.set(cv::CAP_PROP_FOURCC,
+            cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+    
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
+    cap.set(cv::CAP_PROP_FPS, 120);
+
 
     cv::Mat frame;
     int frameCount = 0;
@@ -18,11 +25,12 @@ int main() {
         // Start timing
         auto start = std::chrono::high_resolution_clock::now();
 
-        // Capture frame
-        if (!cap.read(frame)) {
-            std::cerr << "Error: Could not read frame." << std::endl;
-            break;
-        }
+        cap.grab();
+
+        auto endgrap = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> grabdur = endgrap - start;
+
+        cap.retrieve(frame);
 
         // End timing
         auto end = std::chrono::high_resolution_clock::now();
@@ -36,7 +44,9 @@ int main() {
 
         std::cout << "Frame " << frameCount
                   << " | Time: " << ms << " ms"
-                  << " | FPS: " << fps << std::endl;
+                  << " | FPS: " << fps 
+                  << "  time to grab: " << grabdur.count() << "ms"
+                  << std::endl;
 
         // Display frame
         cv::imshow("Camera", frame);

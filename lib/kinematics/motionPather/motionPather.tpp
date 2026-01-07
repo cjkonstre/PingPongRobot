@@ -139,7 +139,6 @@ while (running.load(std::memory_order_acquire)) {
 
     //PRINT_TIME //for timing of the whole IK cycle
 
-
     PosFrameD<7> frame;
     frame.index = 1;
     for (int i = 0; i < 7; i++) {frame.poss[i] = poss[i];}
@@ -180,19 +179,16 @@ while (running.load(std::memory_order_acquire)) {
 
         #endif
 
-        //if (goingtoIdle) { //if previous target was idle, now were there, just 
-            //frames are position now, just keep sending them
-        //    while (running.load(std::memory_order_acquire) && !pendingTarget.load(std::memory_order_acquire)) {
-        //        next_tick += waittime;
-        //        mc.sendFrame(frame); //do nothing until new target is given
-        //        std::this_thread::sleep_until(next_tick);
-        //    }
-        //}
-
         if (scheduleAttached && !schedule.isFinished()) {
             setTarget(schedule.at()); schedule.inc();
         } else if (gotoIdleOnFinish) {
             setTarget(idlePose, Pose{{0, 0, 0}, {0, 0}});
+        } else {
+            while (running.load(std::memory_order_acquire) && !pendingTarget.load(std::memory_order_acquire)) {
+                next_tick += waittime;
+                mc.sendFrame(frame); //do nothing until new target is given
+                std::this_thread::sleep_until(next_tick);
+            }
         }
 
         }

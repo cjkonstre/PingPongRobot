@@ -57,7 +57,7 @@ int main() {
         kinConfig.control_cycle, kinConfig.speeds,
         idle_pose, home_pose,
         *teensy, kin,
-        false
+        false //go idlepos on idle
     );
 
     std::array<double, DOFS> home_qs = kin.doIK(home_pose.pos, home_pose.ori.n(), {0,0,0}, {0,0,0}).qs;
@@ -74,6 +74,7 @@ int main() {
 
     mp.begin(); //idlepos by default once started 
 
+    /* this is a rotation test
     waitInput();
     target.ori = {0, PI/4}; 
     mp.setTarget(target, Pose0vels);
@@ -90,11 +91,12 @@ int main() {
     target.ori = {-PI/8, 0}; 
     mp.setTarget(target, Pose0vels);
 
+    */
 
     target.ori={0, 0};
     for (int i=0; i<3; i++) {
         waitInput();
-        target.pos = randVector({0, 0, PADDLE_HEIGHT}, {TABLE_WIDTH, TABLE_LENGTH, 0.8_m});
+        target.pos = randVector({0, 0, PADDLE_HEIGHT}, {TABLE_WIDTH, TABLE_LENGTH-10._cm, 0.8_m});
         mp.setTarget(target,  Pose0vels);
     }
     

@@ -9,6 +9,8 @@
 
 #include "kinematics/motionPather/motionScheduler.h"
 
+#include "player/kalmanFilter/kalmanFilter.h"
+
 int main() {
     auto kinConfig = load_configs(KINCONFIG_PATH);
     std::cout << "configs loaded\n";

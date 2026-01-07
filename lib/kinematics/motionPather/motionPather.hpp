@@ -12,6 +12,7 @@
 
 //DIAG
 //#define DOPATHERDIAGS
+
 #ifdef DOPATHERDIAGS
 #include "matplotlibcpp.h"
 namespace plt = matplotlibcpp;

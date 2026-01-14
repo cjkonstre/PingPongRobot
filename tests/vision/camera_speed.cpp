@@ -4,7 +4,7 @@
 
 int main() {
     // Open default camera (index 0). Change index if you have multiple cameras.
-    cv::VideoCapture cap("/dev/cam_backRight", cv::CAP_V4L2);
+    cv::VideoCapture cap("/dev/video2", cv::CAP_V4L2);
     if (!cap.isOpened()) {
         std::cerr << "Error: Could not open camera." << std::endl;
         return -1;

@@ -70,11 +70,11 @@ int main() {
     target.pos = {home_pose.pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pose.pos[2]+50._cm};
     target.ori = {0, 0}; //bounds of both at [-pi/2, pi/2]
     mp.setTarget(target,  Pose0vels);
-    //plot3D(kin.getAnchorPoints(toEigenVec(target.pos), toEigenVec(orisp_to_normal(target.ori))));
+    //plot3D(kin.getAnchorPoints(toEigenVec(target.pos), toEigenVec(target.ori.n())));
 
     mp.begin(); //idlepos by default once started 
 
-    /* this is a rotation test
+    //   this is a rotation test
     waitInput();
     target.ori = {0, PI/4}; 
     mp.setTarget(target, Pose0vels);
@@ -91,7 +91,6 @@ int main() {
     target.ori = {-PI/8, 0}; 
     mp.setTarget(target, Pose0vels);
 
-    */
 
     target.ori={0, 0};
     for (int i=0; i<3; i++) {

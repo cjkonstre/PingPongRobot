@@ -1,0 +1,147 @@
+[1mdiff --git a/docs/projectProgress.log b/docs/projectProgress.log[m
+[1mindex e1245b5..859fa25 100644[m
+[1m--- a/docs/projectProgress.log[m
+[1m+++ b/docs/projectProgress.log[m
+[36m@@ -133,4 +133,6 @@[m [mbig thing though apart from processing speed is pulling the data from cameras, a[m
+ probs gonna run seperate reading thread(s), so those would be core limited to reduce the mjpg jitter[m
+ also now that i will eventually have 3 threads, should probably launch them in a better way.[m
+ [m
+[31m-01/03 looks like the grab retreive methods are good. grab takes ~10us to complete[m
+\ No newline at end of file[m
+[32m+[m[32m01/03 looks like the grab retreive methods are good. grab takes ~10us to complete[m
+[32m+[m
+[32m+[m[32m01/12 somehow kin is broken, really not sure why[m
+\ No newline at end of file[m
+[1mdiff --git a/lib/kinematics/motionPather/motionPather.hpp b/lib/kinematics/motionPather/motionPather.hpp[m
+[1mindex a83a61b..fc8c080 100644[m
+[1m--- a/lib/kinematics/motionPather/motionPather.hpp[m
+[1m+++ b/lib/kinematics/motionPather/motionPather.hpp[m
+[36m@@ -52,6 +52,8 @@[m [mprivate:[m
+     void pin_to_core(int core_id);[m
+     void set_realtime_priority(int priority = 80);[m
+ [m
+[32m+[m[32m    void blockingWait(auto& next_tick, const auto& waittime, const auto& frame); // waits for update[m
+[32m+[m
+     bool scheduleAttached = false;[m
+     MotionScheduler schedule;[m
+     bool gotoIdleOnFinish;[m
+[1mdiff --git a/lib/kinematics/motionPather/motionPather.tpp b/lib/kinematics/motionPather/motionPather.tpp[m
+[1mindex 29fbe38..050983a 100644[m
+[1m--- a/lib/kinematics/motionPather/motionPather.tpp[m
+[1m+++ b/lib/kinematics/motionPather/motionPather.tpp[m
+[36m@@ -76,6 +76,15 @@[m [mvoid MotionPather<MC, KS>::set_realtime_priority(int priority) {[m
+     pthread_setschedparam(pthread_self(), SCHED_FIFO, &sch);[m
+ }[m
+ [m
+[32m+[m[32mtemplate <typename MC, typename KS>[m
+[32m+[m[32mvoid MotionPather<MC, KS>::blockingWait(auto& next_tick, const auto& waittime, const auto& frame){[m
+[32m+[m[32m    while (running.load(std::memory_order_acquire) && !pendingTarget.load(std::memory_order_acquire)) {[m
+[32m+[m[32m        next_tick += waittime;[m
+[32m+[m[32m        mc.sendFrame(frame); //do nothing until new target is given[m
+[32m+[m[32m        std::this_thread::sleep_until(next_tick);[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m
+ template <typename MC, typename KS>[m
+ void MotionPather<MC, KS>::loop() {[m
+ [m
+[36m@@ -103,7 +112,7 @@[m [mwhile (running.load(std::memory_order_acquire)) {[m
+     }[m
+ [m
+     next_tick += waittime;[m
+[31m-    auto result = otg.update(input, output);[m
+[32m+[m[32m    auto result = otg.update(input, output); //ruckig happens here[m
+     output.pass_to_input(input);[m
+ [m
+     #ifdef DOPATHERDIAGS[m
+[36m@@ -144,7 +153,7 @@[m [mwhile (running.load(std::memory_order_acquire)) {[m
+     for (int i = 0; i < 7; i++) {frame.poss[i] = poss[i];}[m
+     mc.sendFrame(frame);[m
+ [m
+[31m-    //for (int i = 0; i < 7; i++) {std::cout << frame.poss[i] << ", ";} std::cout << "\n";[m
+[32m+[m[32m    for (int i = 0; i < 7; i++) {std::cout << frame.poss[i] << ", ";} std::cout << "\n";[m
+ [m
+     if (result == ruckig::Result::Finished) {[m
+         //DIAG[m
+[36m@@ -180,16 +189,11 @@[m [mwhile (running.load(std::memory_order_acquire)) {[m
+         #endif[m
+ [m
+         if (scheduleAttached && !schedule.isFinished()) {[m
+[31m-            setTarget(schedule.at()); schedule.inc();[m
+[32m+[m[32m            setTarget(schedule.at()); schedule.inc(); //schedule func[m
+         } else if (gotoIdleOnFinish) {[m
+[31m-            setTarget(idlePose, Pose{{0, 0, 0}, {0, 0}});[m
+[31m-        } else {[m
+[31m-            while (running.load(std::memory_order_acquire) && !pendingTarget.load(std::memory_order_acquire)) {[m
+[31m-                next_tick += waittime;[m
+[31m-                mc.sendFrame(frame); //do nothing until new target is given[m
+[31m-                std::this_thread::sleep_until(next_tick);[m
+[31m-            }[m
+[31m-        }[m
+[32m+[m[32m            setTarget(idlePose, Pose{{0, 0, 0}, {0, 0}}); //if go home on idle, set that as target. should loop this in[m
+[32m+[m[32m            blockingWait(next_tick, waittime, frame);[m
+[32m+[m[32m        } else {blockingWait(next_tick, waittime, frame);}[m
+ [m
+         }[m
+ [m
+[1mdiff --git a/src/motionDemo.cpp b/src/motionDemo.cpp[m
+[1mindex d73eb22..fdc60c9 100644[m
+[1m--- a/src/motionDemo.cpp[m
+[1m+++ b/src/motionDemo.cpp[m
+[36m@@ -70,11 +70,11 @@[m [mint main() {[m
+     target.pos = {home_pose.pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pose.pos[2]+50._cm};[m
+     target.ori = {0, 0}; //bounds of both at [-pi/2, pi/2][m
+     mp.setTarget(target,  Pose0vels);[m
+[31m-    //plot3D(kin.getAnchorPoints(toEigenVec(target.pos), toEigenVec(orisp_to_normal(target.ori))));[m
+[32m+[m[32m    //plot3D(kin.getAnchorPoints(toEigenVec(target.pos), toEigenVec(target.ori.n())));[m
+ [m
+     mp.begin(); //idlepos by default once started [m
+ [m
+[31m-    /* this is a rotation test[m
+[32m+[m[32m    //   this is a rotation test[m
+     waitInput();[m
+     target.ori = {0, PI/4}; [m
+     mp.setTarget(target, Pose0vels);[m
+[36m@@ -91,7 +91,6 @@[m [mint main() {[m
+     target.ori = {-PI/8, 0}; [m
+     mp.setTarget(target, Pose0vels);[m
+ [m
+[31m-    */[m
+ [m
+     target.ori={0, 0};[m
+     for (int i=0; i<3; i++) {[m
+[1mdiff --git a/tests/vision/camera_speed.cpp b/tests/vision/camera_speed.cpp[m
+[1mindex 8c047aa..10b71e8 100644[m
+[1m--- a/tests/vision/camera_speed.cpp[m
+[1m+++ b/tests/vision/camera_speed.cpp[m
+[36m@@ -4,7 +4,7 @@[m
+ [m
+ int main() {[m
+     // Open default camera (index 0). Change index if you have multiple cameras.[m
+[31m-    cv::VideoCapture cap("/dev/cam_backRight", cv::CAP_V4L2);[m
+[32m+[m[32m    cv::VideoCapture cap("/dev/video2", cv::CAP_V4L2);[m
+     if (!cap.isOpened()) {[m
+         std::cerr << "Error: Could not open camera." << std::endl;[m
+         return -1;[m
+[1mdiff --git a/tools/pulleyPos_finder.cpp b/tools/pulleyPos_finder.cpp[m
+[1mindex ef157a9..61cad89 100644[m
+[1m--- a/tools/pulleyPos_finder.cpp[m
+[1m+++ b/tools/pulleyPos_finder.cpp[m
+[36m@@ -152,7 +152,7 @@[m [mint main() {[m
+     }[m
+ }[m
+ [m
+[31m-/*[m
+[32m+[m[32m/* origional[m
+ "pulleyPoss": [[m
+     [1.9912, 1.3416000000000001, 1.11015],[m
+     [1.824, 1.3416000000000001, 0.008799999999999919],[m
+[36m@@ -203,7 +203,7 @@[m [mint main() {[m
+     0.0016995361536422775[m
+ ]*/[m
+ [m
+[31m-/*[m
+[32m+[m[32m/* this one im speptical of[m
+ [[m
+             1.983561693620706,[m
+             1.3337335817245108,[m

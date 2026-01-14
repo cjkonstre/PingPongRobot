@@ -77,6 +77,15 @@ void MotionPather<MC, KS>::set_realtime_priority(int priority) {
 }
 
 template <typename MC, typename KS>
+void MotionPather<MC, KS>::blockingWait(auto& next_tick, const auto& waittime, const auto& frame){
+    while (running.load(std::memory_order_acquire) && !pendingTarget.load(std::memory_order_acquire)) {
+        next_tick += waittime;
+        mc.sendFrame(frame); //do nothing until new target is given
+        std::this_thread::sleep_until(next_tick);
+    }
+}
+
+template <typename MC, typename KS>
 void MotionPather<MC, KS>::loop() {
 
 pin_to_core(2);             // change if desired
@@ -103,7 +112,7 @@ while (running.load(std::memory_order_acquire)) {
     }
 
     next_tick += waittime;
-    auto result = otg.update(input, output);
+    auto result = otg.update(input, output); //ruckig happens here
     output.pass_to_input(input);
 
     #ifdef DOPATHERDIAGS
@@ -144,7 +153,7 @@ while (running.load(std::memory_order_acquire)) {
     for (int i = 0; i < 7; i++) {frame.poss[i] = poss[i];}
     mc.sendFrame(frame);
 
-    //for (int i = 0; i < 7; i++) {std::cout << frame.poss[i] << ", ";} std::cout << "\n";
+    for (int i = 0; i < 7; i++) {std::cout << frame.poss[i] << ", ";} std::cout << "\n";
 
     if (result == ruckig::Result::Finished) {
         //DIAG
@@ -180,16 +189,11 @@ while (running.load(std::memory_order_acquire)) {
         #endif
 
         if (scheduleAttached && !schedule.isFinished()) {
-            setTarget(schedule.at()); schedule.inc();
+            setTarget(schedule.at()); schedule.inc(); //schedule func
         } else if (gotoIdleOnFinish) {
-            setTarget(idlePose, Pose{{0, 0, 0}, {0, 0}});
-        } else {
-            while (running.load(std::memory_order_acquire) && !pendingTarget.load(std::memory_order_acquire)) {
-                next_tick += waittime;
-                mc.sendFrame(frame); //do nothing until new target is given
-                std::this_thread::sleep_until(next_tick);
-            }
-        }
+            setTarget(idlePose, Pose{{0, 0, 0}, {0, 0}}); //if go home on idle, set that as target. should loop this in
+            blockingWait(next_tick, waittime, frame);
+        } else {blockingWait(next_tick, waittime, frame);}
 
         }
 

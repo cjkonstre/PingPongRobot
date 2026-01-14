@@ -134,3 +134,5 @@ probs gonna run seperate reading thread(s), so those would be core limited to re
 also now that i will eventually have 3 threads, should probably launch them in a better way.
 
 01/03 looks like the grab retreive methods are good. grab takes ~10us to complete
+
+01/12 somehow kin is broken, really not sure why

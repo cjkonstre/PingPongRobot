@@ -52,6 +52,8 @@ private:
     void pin_to_core(int core_id);
     void set_realtime_priority(int priority = 80);
 
+    void blockingWait(auto& next_tick, const auto& waittime, const auto& frame); // waits for update
+
     bool scheduleAttached = false;
     MotionScheduler schedule;
     bool gotoIdleOnFinish;

@@ -8,7 +8,7 @@
 #include "utils.h"
 
 #include "kinematics/motionPather/motionScheduler.h"
-
+#include <opencv2/opencv.hpp>
 #include "player/kalmanFilter/kalmanFilter.h"
 
 int main() {
@@ -35,34 +35,44 @@ int main() {
 
     std::array<double, DOFS> home_qs = kin.doIK(home_pose.pos, home_pose.ori.n(), {0,0,0}, {0,0,0}).qs;
     doHoming_presetPos(*teensy, home_qs);
+
+
+    Pose target;
     
-
-    MotionScheduler schedule;
-    schedule.loop = false;
-    MotionScheduler::Frame frame;
-
-    double angle = 3*PI/8;
-    for (int i=0; i<50; i++){
-        frame.spat.pos = {TABLE_WIDTH/2, 0.25, 0.25};
-        frame.spat.ori = {0, angle};
-        frame.vels.pos = {0, cos(angle), sin(angle)};
-        frame.vels.ori = {0, 0};
-        schedule.add(frame);
-
-        frame.spat.pos = {TABLE_WIDTH/2, 0.25+cos(angle), 0.25+cos(angle)};
-        schedule.add(frame);
-    }
-    frame.vels = Pose0vels;
-    schedule.add(frame);
-
-    mp.attachSchedule(schedule);
+    target.pos = {home_pose.pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pose.pos[2]+50._cm};
+    target.ori = {0, 0};
+    mp.setTarget(target, Pose0vels, 2);
 
     /* --start code-- */
     waitInput("begin");
-    //sleep(10);
     mp.begin();
 
+    waitInput();
 
+    cv::Mat im(100, 100, CV_32FC1);
+    while (true){
+        cv::imshow("in", im);
+        int k = cv::waitKey();
+
+        if      (k=='w') {target.pos[1]+=0.1;}
+        else if (k=='s') {target.pos[1]-=0.1;}
+        else if (k=='a') {target.pos[0]+=0.1;}
+        else if (k=='d') {target.pos[0]-=0.1;}
+        else if (k=='q') {target.pos[2]+=0.1;}
+        else if (k=='e') {target.pos[2]-=0.1;}
+
+        else if (k=='j') {target.ori.theta+=0.1;}
+        else if (k=='l') {target.ori.theta-=0.1;}
+        else if (k=='i') {target.ori.phi+=0.1;}
+        else if (k=='k') {target.ori.phi-=0.1;}
+
+        else if (k==27) {break;}
+        for (float i: target.to5vec()) {std::cout << i << ", ";} std::cout << "\n";
+
+        //waitInput();
+        mp.setTarget(target, Pose0vels);
+    }
+    cv::destroyAllWindows();
 
     waitInput("home");
     mp.setTarget(home_pose, Pose0vels, 2.5);

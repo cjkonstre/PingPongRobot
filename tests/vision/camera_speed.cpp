@@ -1,10 +1,18 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <chrono>
+int main(int argc, char** argv) {
+    // Default device if none provided
+    std::string device = "/dev/video2";
 
-int main() {
-    // Open default camera (index 0). Change index if you have multiple cameras.
-    cv::VideoCapture cap("/dev/video2", cv::CAP_V4L2);
+    // If user passed an argument, use it
+    if (argc >= 2) {
+        device = argv[1];
+    }
+
+    std::cout << "Opening camera: " << device << std::endl;
+
+    cv::VideoCapture cap(device, cv::CAP_V4L2);
     if (!cap.isOpened()) {
         std::cerr << "Error: Could not open camera." << std::endl;
         return -1;
@@ -12,9 +20,9 @@ int main() {
     cap.set(cv::CAP_PROP_FOURCC,
             cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
     
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
-    cap.set(cv::CAP_PROP_FPS, 120);
+    //cap.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    //cap.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
+    //cap.set(cv::CAP_PROP_FPS, 120);
 
 
     cv::Mat frame;

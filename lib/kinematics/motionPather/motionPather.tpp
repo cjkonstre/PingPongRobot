@@ -1,7 +1,7 @@
 #include <iostream>
 #include "kinematics/motionPather/motionPather.hpp"
 #include "kinematics/SCComms/packet.h"
-
+#include "utils/timeLog/timeLog.hpp"
 
 #define START_TIME using std::chrono::high_resolution_clock; \
                     using std::chrono::duration_cast; \
@@ -13,6 +13,7 @@
                     auto ms_int = duration_cast<milliseconds>(timing_nonameconflict_t2 - timing_nonameconflict_t1); \
                     duration<double, std::milli> ms_double = timing_nonameconflict_t2 - timing_nonameconflict_t1; \
                     std::cout << ms_double.count() * 1000<< "us\n"; \
+
 
 template <typename MC, typename KS>
 MotionPather<MC, KS>::MotionPather(
@@ -151,11 +152,14 @@ while (running.load(std::memory_order_acquire)) {
     PosFrameD<7> frame;
     frame.index = 1;
     for (int i = 0; i < 7; i++) {frame.poss[i] = poss[i];}
+    //TIMELOG << "sending frame...\n";
     mc.sendFrame(frame);
+    //TIMELOG << "done\n";
 
-    for (int i = 0; i < 7; i++) {std::cout << frame.poss[i] << ", ";} std::cout << "\n";
+    //TIMELOG; for (int i = 0; i < 7; i++) {std::cout << frame.poss[i] << ", ";} std::cout << "\n";
 
     if (result == ruckig::Result::Finished) {
+        TIMELOG << "target reached\n";
         //DIAG
         #ifdef DOPATHERDIAGS
         ts.pop_back();
@@ -192,7 +196,6 @@ while (running.load(std::memory_order_acquire)) {
             setTarget(schedule.at()); schedule.inc(); //schedule func
         } else if (gotoIdleOnFinish) {
             setTarget(idlePose, Pose{{0, 0, 0}, {0, 0}}); //if go home on idle, set that as target. should loop this in
-            blockingWait(next_tick, waittime, frame);
         } else {blockingWait(next_tick, waittime, frame);}
 
         }

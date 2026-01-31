@@ -36,9 +36,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+
 #lib vars
 set(UTIL_LIBS matplotlibcpp) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
-set(VISION_LIBS ${OpenCV_LIBS} )#arducam_evk_sdk::arducam_evk_sdk)
+set(VISION_LIBS ${OpenCV_LIBS} freenect)#arducam_evk_sdk::arducam_evk_sdk)
 set(KIN_LIBS Threads::Threads Ruckig::Ruckig Eigen3::Eigen Boost::system)
 
 # ===== Libraries =====
@@ -79,13 +80,13 @@ endfunction()
 # Everything in src/ with Ruckig + Eigen + OpenCV
 add_execs("${CMAKE_SOURCE_DIR}/src"
   PREFIX ""
-  LIBS robotlibs core ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
+  LIBS robotlibs core ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS} ${VISION_LIBS}
 )
 
 # Everything in tools/ with Ruckig + Eigen + OpenCV
 add_execs("${CMAKE_SOURCE_DIR}/tools"
   PREFIX ""
-  LIBS robotlibs core Eigen3::Eigen Ceres::ceres ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS}
+  LIBS robotlibs core Eigen3::Eigen Ceres::ceres ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS} ${VISION_LIBS}
 )
 
 #tets

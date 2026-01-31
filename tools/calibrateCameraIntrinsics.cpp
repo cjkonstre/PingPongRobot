@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     if (argc < 6) {
         cout << "Usage: " << argv[0]
              << " --camera <idx> <squaresX> <squaresY> <squareLength(m)> <markerLength(m)>" << endl;
-        cout << "Example: " << argv[0] << " --camera 2 5 7 0.04 0.02" << endl;
+        cout << "Example: " << argv[0] << " --camera /dev/video2 5 7 0.04 0.02" << endl;
         return 0;
     }
 

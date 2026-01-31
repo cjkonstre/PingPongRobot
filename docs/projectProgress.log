@@ -136,3 +136,8 @@ also now that i will eventually have 3 threads, should probably launch them in a
 01/03 looks like the grab retreive methods are good. grab takes ~10us to complete
 
 01/12 somehow kin is broken, really not sure why
+
+01/17 finally weekend. kin was broken due to frame being loose. did camra symlinks on the usb hub
+
+01/19 think i figuredeout hte weird inconsistancies in movement, that ive labeled as a kin bug
+the motion pather prematurely stops in its movement, ending with a non zero velocity that it tries to maintain

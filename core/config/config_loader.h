@@ -10,6 +10,4 @@ struct KinConfig final {
     std::array<std::array<double, 3>, 7> pulleyPoss;
 };
 
-const std::string KINCONFIG_PATH = "/home/connor/PingPongRobot/core/config/kin_conf.json";
-
 KinConfig load_configs(const std::string& path);

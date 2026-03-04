@@ -5,7 +5,7 @@
 #include <iostream>
 
 struct TimeLogStream {
-    TimeLogStream();
+    TimeLogStream(bool dodt = false);
 
     template<typename T>
     TimeLogStream& operator<<(const T& value);
@@ -14,5 +14,11 @@ struct TimeLogStream {
 };
 
 #define TIMELOG TimeLogStream()
+#define TIMELOGDT TimeLogStream(true)
+
+inline std::int64_t __timelogger_last_us = 0;
+
+
 
 #include "timeLog.tpp"
+

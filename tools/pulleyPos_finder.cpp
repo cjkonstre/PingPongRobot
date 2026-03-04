@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 #include <ceres/ceres.h>
 #include "config/config_loader.h"
+#include "config/config.h"
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
@@ -11,12 +12,13 @@ using json = nlohmann::json;
 #include <fstream>
 
 //#define DO_MANUAL_POINTS
-std::array<std::array<double, 3>, 5> autopoints = {{
+std::array<std::array<double, 3>, 6> autopoints = {{
     {{0, 1.2716, 0}},
     {{0, 0, 0}}, 
     {{1.524, 0, 0}}, 
     {{1.524, 1.2716, 0}},
-    {{0.6, 1.2716, 0}}
+    {{0.6, 1.2716, 0}},
+    {{0.762, 0.8716, 0.363}}
 }} ;
 
 struct CableResidual {
@@ -119,9 +121,17 @@ int main() {
             problem.AddResidualBlock(cost, nullptr, c.data());
         }
 
+        //problem.SetParameterLowerBound(c.data(), 2, 0.0);
+
         ceres::Solver::Options options;
         options.linear_solver_type = ceres::DENSE_QR;
         options.minimizer_progress_to_stdout = true;
+
+        options.function_tolerance = 1e-14;
+        options.gradient_tolerance = 1e-14;
+        options.parameter_tolerance = 1e-14;
+        options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
+        options.max_num_iterations = 100;
 
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);

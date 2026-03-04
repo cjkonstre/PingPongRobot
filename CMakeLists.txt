@@ -46,7 +46,7 @@ set(KIN_LIBS Threads::Threads Ruckig::Ruckig Eigen3::Eigen Boost::system)
 file(GLOB_RECURSE LIB_SOURCES "${CMAKE_SOURCE_DIR}/lib/*.cpp")
 add_library(robotlibs STATIC ${LIB_SOURCES})
 target_include_directories(robotlibs PUBLIC ${CMAKE_SOURCE_DIR}/lib)
-target_link_libraries(robotlibs PUBLIC Eigen3::Eigen Ruckig::Ruckig Boost::system Threads::Threads)
+target_link_libraries(robotlibs PUBLIC ${UTIL_LIBS} ${KIN_LIBS} ${OpenCV_LIBS})
 
 file(GLOB_RECURSE CORE_SOURCES "${CMAKE_SOURCE_DIR}/core/*.cpp")
 add_library(core STATIC ${CORE_SOURCES})

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <filesystem>
+#include "config/config.h"
 
 using namespace cv;
 using namespace std;
@@ -27,6 +28,11 @@ int main(int argc, char** argv) {
 
     VideoCapture inputVideo;
     inputVideo.open(cameraArg);
+    inputVideo.set(cv::CAP_PROP_FOURCC,
+            cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+    inputVideo.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    inputVideo.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
+    inputVideo.set(cv::CAP_PROP_FPS, 120);
 
     std::cout << "'c' to collect foreground, ball ROI (do inside) \n'esc to finish";
     std::vector<cv::Mat> fg_samples;
@@ -35,7 +41,7 @@ int main(int argc, char** argv) {
         inputVideo >> image;
         if (image.empty()) break;
 
-        cv::GaussianBlur(image, image, cv::Size(7, 7), 0);
+        cv::GaussianBlur(image, image, cv::Size(3, 3), 0);
         Mat lab;
         cv::cvtColor(image, lab, cv::COLOR_BGR2Lab);
 
@@ -81,14 +87,25 @@ int main(int argc, char** argv) {
 
     Sigma /= (fg_ab.rows - 1);
 
+    mu.convertTo(mu, CV_32F);
+    Sigma.convertTo(Sigma, CV_32F);
+
+
 
     cv::Mat invS; cv::invert(Sigma, invS, cv::DECOMP_SVD);
+
+    cv::FileStorage fs(DETCONFIG_PATH, cv::FileStorage::WRITE);
+    fs << "mu" << mu;
+    fs << "Sigma" << Sigma;
+    fs.release();
+
+    std::cout << "Saved Gaussian model to " << DETCONFIG_PATH << std::endl;
 
     while (true) {
         cv::Mat frame;
         if (!inputVideo.read(frame)) continue;
 
-        cv::GaussianBlur(frame, frame, cv::Size(7,7), 0);
+        cv::GaussianBlur(frame, frame, cv::Size(3,3), 0);
 
         cv::Mat lab;
         cv::cvtColor(frame, lab, cv::COLOR_BGR2Lab);

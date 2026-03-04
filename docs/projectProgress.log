@@ -143,3 +143,7 @@ also now that i will eventually have 3 threads, should probably launch them in a
 the motion pather prematurely stops in its movement, ending with a non zero velocity that it tries to maintain
 
 01/31 got it copying the player.
+
+02/19 working on detection now, got it alr. tested det speeds in tests/dettest.cpp, def quite slow. full res @ 1200x800px is ~90ms to complete
+  assumig its linea in speed, 200x200px ROI might take ~4ms to complete. this is half of the time budjet for fast control cycle of 8ms
+  working w/ it for now, def needs to be optimized tho

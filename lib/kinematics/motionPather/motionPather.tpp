@@ -1,7 +1,7 @@
 #include <iostream>
 #include "kinematics/motionPather/motionPather.hpp"
 #include "kinematics/SCComms/packet.h"
-#include "utils/timeLog/timeLog.hpp"
+#include "misc/timeLog/timeLog.hpp"
 
 #define START_TIME using std::chrono::high_resolution_clock; \
                     using std::chrono::duration_cast; \

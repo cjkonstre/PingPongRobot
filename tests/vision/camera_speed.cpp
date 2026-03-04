@@ -17,12 +17,12 @@ int main(int argc, char** argv) {
         std::cerr << "Error: Could not open camera." << std::endl;
         return -1;
     }
+    
     cap.set(cv::CAP_PROP_FOURCC,
             cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-    
-    //cap.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
-    //cap.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
-    //cap.set(cv::CAP_PROP_FPS, 120);
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
+    cap.set(cv::CAP_PROP_FPS, 120);
 
 
     cv::Mat frame;

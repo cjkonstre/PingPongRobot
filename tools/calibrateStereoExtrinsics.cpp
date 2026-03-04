@@ -39,8 +39,8 @@ int main(int argc, char** argv) {
     BallDetector balldet(DETCONFIG_PATH);
 
     Mat K1, D1, K2, D2;
-    string cam1Name = filesystem::path(argv[0]).filename();
-    string cam2Name = filesystem::path(argv[1]).filename();
+    string cam1Name = filesystem::path(argv[1]).filename();
+    string cam2Name = filesystem::path(argv[2]).filename();
     string cam1intrinsics = "/home/connor/PingPongRobot/core/config/vision/" + cam1Name + "-intrinsics.yml";
     string cam2intrinsics = "/home/connor/PingPongRobot/core/config/vision/" + cam2Name + "-intrinsics.yml";
 
@@ -49,8 +49,21 @@ int main(int argc, char** argv) {
     FileStorage fs2(cam2intrinsics, FileStorage::READ);
     fs1["camera_matrix"] >> K2; fs2["dist_coeffs"] >> D2; fs2.release();
 
-    VideoCapture cap1(argv[0]);
-    VideoCapture cap2(argv[1]);
+    VideoCapture cap1(argv[1]);
+    VideoCapture cap2(argv[2]);
+
+    //incorrect if it doesnt offer sm like this
+    cap1.set(cv::CAP_PROP_FOURCC,
+            cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+    cap1.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    cap1.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
+    cap1.set(cv::CAP_PROP_FPS, 120);
+
+    cap2.set(cv::CAP_PROP_FOURCC,
+            cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+    cap2.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    cap2.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
+    cap2.set(cv::CAP_PROP_FPS, 120);
 
     /* --start code-- */
     waitInput("begin");
@@ -62,32 +75,37 @@ int main(int argc, char** argv) {
     vector<Point3f> IRLpoints;
     Size imsize;
 
-    Pose target;
+    Pose target = idle_pose;
     while (true) {
         Mat im1, imcpy1, im2, imcpy2;
-        cap1.grab();
+        /*cap1.grab();
         cap2.grab();
         cap1.retrieve(im1); if (im1.empty()) break; im1.copyTo(imcpy1);
         cap2.retrieve(im2); if (im2.empty()) break; im2.copyTo(imcpy2);
-        imsize = im1.size();
+        imsize = im1.size();*/
+
+        cap1.read(im1); if (im1.empty()) break; im1.copyTo(imcpy1);
+        cap2.read(im2); if (im2.empty()) break; im2.copyTo(imcpy2);
 
 
         Point2f ppxpos1, ppxpos2; float rad;
 
-        balldet.findBall(im1, ppxpos1, rad);
-        circle(imcpy1, ppxpos1, (int)rad, Scalar(0, 255, 0), 5);
+        bool ret = balldet.findBall(im1, ppxpos1, rad);
+        if (ret) circle(imcpy1, ppxpos1, (int)rad, Scalar(0, 255, 0), 5);
         imshow("cap 1", imcpy1);
 
 
-        balldet.findBall(im2, ppxpos2, rad);
-        circle(imcpy2, ppxpos2, (int)rad, Scalar(0, 255, 0), 5);
-        imshow("cap 1", imcpy2);
+        ret = balldet.findBall(im2, ppxpos2, rad);
+        if (ret) circle(imcpy2, ppxpos2, (int)rad, Scalar(0, 255, 0), 5);
+        imshow("cap 2", imcpy2);
 
         auto k = waitKey(1);
         if (k == 27) break; // ESC fallback
 
         //interactive target control
-        const double mvspeed = 10._cm;
+        //would be cool to make an interactive target control object or some easier interface class
+        //could live in player
+        const double mvspeed = 10._cm; 
         if      (k=='w') target.pos[1] += mvspeed;
         else if (k=='s') target.pos[1] -= mvspeed;
         else if (k=='a') target.pos[0] += mvspeed;
@@ -106,6 +124,9 @@ int main(int argc, char** argv) {
         }
     }
 
+    if (IRLpoints.size()>5) {
+
+    std::cout << "calinrating...";
     cv::Mat R, T, E, F;
     double rms = cv::stereoCalibrate(
         IRLpoints,
@@ -142,6 +163,8 @@ int main(int argc, char** argv) {
     fs << "rms" << rms;
     fs.release();
     cout << "saved calibration to " << filename << endl;
+
+    } else std::cout << "not enough data\n";
 
     waitInput("home");
     mp.setTarget(home_pose, Pose0vels);

@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <filesystem>
+#include "vision/camera/camera.h"
 
 using namespace cv;
 using namespace std;
@@ -36,34 +37,18 @@ int main(int argc, char** argv) {
     doHoming_presetPos(*teensy, home_qs);
     //kin done ^^
 
-    BallDetector balldet(DETCONFIG_PATH);
 
-    Mat K1, D1, K2, D2;
     string cam1Name = filesystem::path(argv[1]).filename();
     string cam2Name = filesystem::path(argv[2]).filename();
     string cam1intrinsics = "/home/connor/PingPongRobot/core/config/vision/" + cam1Name + "-intrinsics.yml";
     string cam2intrinsics = "/home/connor/PingPongRobot/core/config/vision/" + cam2Name + "-intrinsics.yml";
 
-    FileStorage fs1(cam1intrinsics, FileStorage::READ);
-    fs1["camera_matrix"] >> K1; fs1["dist_coeffs"] >> D1; fs1.release();
-    FileStorage fs2(cam2intrinsics, FileStorage::READ);
-    fs1["camera_matrix"] >> K2; fs2["dist_coeffs"] >> D2; fs2.release();
+    Camera cam1(argv[1], cam1intrinsics, 1280, 800, 120, 40);
+    Camera cam2(argv[2], cam1intrinsics, 1280, 800, 120, 40);
 
-    VideoCapture cap1(argv[1]);
-    VideoCapture cap2(argv[2]);
+    BallDetector balldet1(DETCONFIG_PATH, cam1Name);
+    BallDetector balldet2(DETCONFIG_PATH, cam2Name);
 
-    //incorrect if it doesnt offer sm like this
-    cap1.set(cv::CAP_PROP_FOURCC,
-            cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-    cap1.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
-    cap1.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
-    cap1.set(cv::CAP_PROP_FPS, 120);
-
-    cap2.set(cv::CAP_PROP_FOURCC,
-            cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-    cap2.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
-    cap2.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
-    cap2.set(cv::CAP_PROP_FPS, 120);
 
     /* --start code-- */
     waitInput("begin");
@@ -84,28 +69,26 @@ int main(int argc, char** argv) {
         cap2.retrieve(im2); if (im2.empty()) break; im2.copyTo(imcpy2);
         imsize = im1.size();*/
 
-        cap1.read(im1); if (im1.empty()) break; im1.copyTo(imcpy1);
-        cap2.read(im2); if (im2.empty()) break; im2.copyTo(imcpy2);
+        cam1.read(im1); if (im1.empty()) break; im1.copyTo(imcpy1);
+        cam2.read(im2); if (im2.empty()) break; im2.copyTo(imcpy2);
 
 
         Point2f ppxpos1, ppxpos2; float rad;
 
-        bool ret = balldet.findBall(im1, ppxpos1, rad);
+        bool ret = balldet1.findBall(im1, ppxpos1, rad);
         if (ret) circle(imcpy1, ppxpos1, (int)rad, Scalar(0, 255, 0), 5);
-        imshow("cap 1", imcpy1);
+        imshow(cam1Name, imcpy1);
 
-
-        ret = balldet.findBall(im2, ppxpos2, rad);
+        ret = balldet2.findBall(im2, ppxpos2, rad);
         if (ret) circle(imcpy2, ppxpos2, (int)rad, Scalar(0, 255, 0), 5);
-        imshow("cap 2", imcpy2);
+        imshow(cam2Name, imcpy2);
 
-        auto k = waitKey(1);
-        if (k == 27) break; // ESC fallback
+        auto k = waitKey(10); if (k == 27) break; //esc
 
         //interactive target control
         //would be cool to make an interactive target control object or some easier interface class
         //could live in player
-        const double mvspeed = 10._cm; 
+        const double mvspeed = 5._cm; 
         if      (k=='w') target.pos[1] += mvspeed;
         else if (k=='s') target.pos[1] -= mvspeed;
         else if (k=='a') target.pos[0] += mvspeed;
@@ -132,8 +115,8 @@ int main(int argc, char** argv) {
         IRLpoints,
         cap1points,
         cap2points,
-        K1, D1,
-        K2, D2,
+        cam1.intrinsics.K, cam1.intrinsics.D,
+        cam2.intrinsics.K, cam2.intrinsics.D,
         imsize, //idk, set to 1st cam
         R, T, E, F,
         cv::CALIB_FIX_INTRINSIC,

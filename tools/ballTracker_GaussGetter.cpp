@@ -4,11 +4,26 @@
 #include <opencv2/aruco/charuco.hpp>
 #include <iostream>
 #include <string>
-#include <filesystem>
+#include <nlohmann/json.hpp>
 #include "config/config.h"
 
 using namespace cv;
 using namespace std;
+using json = nlohmann::json;
+
+json matToJson(const cv::Mat& m)
+{
+    json j;
+    j["rows"] = m.rows;
+    j["cols"] = m.cols;
+
+    std::vector<float> data;
+    data.assign((float*)m.datastart, (float*)m.dataend);
+
+    j["data"] = data;
+
+    return j;
+}
 
 int main(int argc, char** argv) {
     if (argc < 1) {
@@ -25,6 +40,8 @@ int main(int argc, char** argv) {
         argv += 2;
         argc -= 2;
     }
+
+    std::string camName = std::filesystem::path(cameraArg).filename().string();
 
     VideoCapture inputVideo;
     inputVideo.open(cameraArg);
@@ -90,16 +107,27 @@ int main(int argc, char** argv) {
     mu.convertTo(mu, CV_32F);
     Sigma.convertTo(Sigma, CV_32F);
 
-
-
     cv::Mat invS; cv::invert(Sigma, invS, cv::DECOMP_SVD);
 
-    cv::FileStorage fs(DETCONFIG_PATH, cv::FileStorage::WRITE);
-    fs << "mu" << mu;
-    fs << "Sigma" << Sigma;
-    fs.release();
+    json config;
 
-    std::cout << "Saved Gaussian model to " << DETCONFIG_PATH << std::endl;
+    /* load existing file if present */
+    if (std::filesystem::exists(DETCONFIG_PATH)) {
+        std::ifstream in(DETCONFIG_PATH);
+        in >> config;
+    }
+
+    /* overwrite or insert this camera */
+    config[camName]["mu"] = matToJson(mu);
+    config[camName]["Sigma"] = matToJson(Sigma);
+
+    /* write back */
+    std::ofstream out(DETCONFIG_PATH);
+    out << config.dump(4);
+
+    std::cout << "Saved Gaussian model for "
+            << camName << " to "
+            << DETCONFIG_PATH << std::endl;
 
     while (true) {
         cv::Mat frame;

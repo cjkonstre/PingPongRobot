@@ -30,7 +30,7 @@ struct MotionPacketD {
 #pragma pack(push, 1) //no padding
 template <int DoFs>
 struct PosFrameD {
-    std::array<float, 7> poss;
+    std::array<float, DoFs> poss;
     uint32_t index;
 };
 #pragma pack(pop)

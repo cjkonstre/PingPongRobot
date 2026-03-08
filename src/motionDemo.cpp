@@ -61,17 +61,16 @@ int main() {
     );
 
     std::array<double, DOFS> home_qs = kin.doIK(home_pose.pos, home_pose.ori.n(), {0,0,0}, {0,0,0}).qs;
-    doHoming_presetPos(*teensy, home_qs);
+    doHoming_presetPos(*teensy, home_qs); //pulley lens at start pos
     
     /* --start code-- */
     waitInput("begin");
 
     Pose target; 
-    target.pos = {home_pose.pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pose.pos[2]+50._cm};
-    target.ori = {0, 0}; //bounds of both at [-pi/2, pi/2]
-    mp.setTarget(target,  Pose0vels);
-    //plot3D(kin.getAnchorPoints(toEigenVec(target.pos), toEigenVec(target.ori.n())));
-
+    target.pos = idle_pose.pos;//{home_pose.pos[0], 100._cm, home_pose.pos[2]};
+    target.ori = ORI_sp_FORWARD; //bounds of both at [-pi/2, pi/2]
+    //mp.setTarget(target,  Pose0vels);
+    
     mp.begin(); //idlepos by default once started 
 
     //   this is a rotation test
@@ -91,7 +90,7 @@ int main() {
     target.ori = {-PI/8, 0}; 
     mp.setTarget(target, Pose0vels);
 
-
+    //some movement
     target.ori={0, 0};
     for (int i=0; i<3; i++) {
         waitInput();

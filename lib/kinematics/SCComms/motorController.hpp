@@ -19,7 +19,7 @@ public:
     MotorControllerD(const char* device);
     MotorControllerD() = default;
 
-    inline std::size_t sendFrame(Frame frame);
+    inline std::size_t sendFrame(const Frame& frame);
 
     void sendCommand(uint8_t command, uint8_t arg);
     void sendCommand(uint8_t command, uint8_t arg, std::array<double, 7> poss);

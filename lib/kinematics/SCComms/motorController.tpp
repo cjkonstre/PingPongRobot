@@ -14,7 +14,7 @@ MotorControllerD<DOFS, Frame>::MotorControllerD(const char* device)
 }
 
 template <int DOFS, typename Frame>
-inline std::size_t MotorControllerD<DOFS, Frame>::sendFrame(Frame frame) {
+inline std::size_t MotorControllerD<DOFS, Frame>::sendFrame(const Frame& frame) {
     return boost::asio::write(port, boost::asio::buffer(&frame, sizeof(frame))); //may need to be improved
 }
 

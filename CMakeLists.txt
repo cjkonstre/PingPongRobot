@@ -38,7 +38,7 @@ FetchContent_MakeAvailable(nlohmann_json)
 
 
 #lib vars
-set(UTIL_LIBS matplotlibcpp) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
+set(UTIL_LIBS matplotlibcpp nlohmann_json::nlohmann_json) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
 set(VISION_LIBS ${OpenCV_LIBS} freenect)#arducam_evk_sdk::arducam_evk_sdk)
 set(KIN_LIBS Threads::Threads Ruckig::Ruckig Eigen3::Eigen Boost::system)
 

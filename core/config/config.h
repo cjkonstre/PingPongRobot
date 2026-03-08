@@ -16,7 +16,7 @@
 #define DOFS 7
 
 const std::string KINCONFIG_PATH = "/home/connor/PingPongRobot/core/config/kin_conf.json"; //path to kinematics config
-const std::string DETCONFIG_PATH = "/home/connor/PingPongRobot/core/config/vision/det_conf.yml"; //path to ball detection config
+const std::string DETCONFIG_PATH = "/home/connor/PingPongRobot/core/config/vision/det_conf.json"; //path to ball detection config
 
 //aliases
 using PosFrame = PosFrameD<DOFS>;

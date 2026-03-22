@@ -4,12 +4,12 @@
 
 #include "kinematics/inverseK/inverseKin.hpp"
 #include "kinematics/motionPather/motionPather.hpp"
+
+#include "vision/ballDet/ballDet.h"
+#include "vision/stereo/multiStereo.h"
+
 #include "config/config.h"
 #include "utils.h"
-
-#include "kinematics/motionPather/motionScheduler.h"
-#include <opencv2/opencv.hpp>
-#include "player/kalmanFilter/kalmanFilter.h"
 
 int main() {
     auto kinConfig = load_configs(KINCONFIG_PATH);
@@ -36,47 +36,42 @@ int main() {
     std::array<double, DOFS> home_qs = kin.doIK(home_pose.pos, home_pose.ori.n(), {0,0,0}, {0,0,0}).qs;
     doHoming_presetPos(*teensy, home_qs);
 
+    Camera camBL("/dev/cam_BL", CONF_PATH + "vision/cam_BL-intrinsics.yml", 1280, 800, 120, 35);
+    Camera camBR("/dev/cam_BR", CONF_PATH + "vision/cam_BR-intrinsics.yml", 1280, 800, 120, 35);
+    Camera camMR("/dev/cam_MR", CONF_PATH + "vision/cam_MR-intrinsics.yml", );
+    BallDetector balldet(DETCONFIG_PATH, camBL.capName); //need to fix
 
-    Pose target;
-    
-    target.pos = {home_pose.pos[0]+20._cm, TABLE_LENGTH-50._cm, home_pose.pos[2]+50._cm};
-    target.ori = {0, 0};
-    mp.setTarget(target, Pose0vels, 2);
+    TriStereo vis(camBL, camBR, camMR, balldet);
+
+    class PlayerModel {} smarts;
+
+    //code V
 
     /* --start code-- */
     waitInput("begin");
     mp.begin();
 
-    waitInput();
+    GaussBlob<3> currentState;
 
-    cv::Mat im(100, 100, CV_32FC1);
-    while (true){
-        cv::imshow("in", im);
-        int k = cv::waitKey();
+    bool running = true;
+    while (running) {
+        GaussBlob<3> measurement = vis.getMeasurement(currentState);
+        currentState *= measurement; //pretend combine with easurement
 
-        if      (k=='w') {target.pos[1]+=0.1;}
-        else if (k=='s') {target.pos[1]-=0.1;}
-        else if (k=='a') {target.pos[0]+=0.1;}
-        else if (k=='d') {target.pos[0]-=0.1;}
-        else if (k=='q') {target.pos[2]+=0.1;}
-        else if (k=='e') {target.pos[2]-=0.1;}
+        target = smarts.think(currentState.mu); //mu is 6 dims
 
-        else if (k=='j') {target.ori.theta+=0.1;}
-        else if (k=='l') {target.ori.theta-=0.1;}
-        else if (k=='i') {target.ori.phi+=0.1;}
-        else if (k=='k') {target.ori.phi-=0.1;}
-
-        else if (k==27) {break;}
-        for (float i: target.to5vec()) {std::cout << i << ", ";} std::cout << "\n";
-
-        //waitInput();
-        mp.setTarget(target, Pose0vels);
+        currentState = timeStep * currentState; //timestep forward
+        waitUntilNext();
     }
-    cv::destroyAllWindows();
 
     waitInput("home");
     mp.setTarget(home_pose, Pose0vels, 2.5);
     sleep(3);
+
     mp.stop();
+    camBL.release();
+    camBR.release();
+    camMR.release();
+
     return 0;
 }

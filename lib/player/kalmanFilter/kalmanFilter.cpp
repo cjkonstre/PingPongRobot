@@ -36,7 +36,6 @@ void KalmanModel::set_dt(const double& dt) {
     control_mat.block<3, 3>(0, 0).diagonal().setConstant(0.5*dt*dt);
     control_mat.block<3, 3>(3, 0).diagonal().setConstant(dt);
 
-
     double sigma_a2 = noise_sigma; 
     noise_covariance.setZero();
     double dt2 = dt * dt;

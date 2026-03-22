@@ -4,3 +4,7 @@ if more geared towards interactive/explanatory, put in /demos (now in /src)
 mirrors lib layout
 kinda a development zone/ pericewise testing zone. 
 if tests become more mature into kinda demo territory move them
+
+this is a pretty outdated folder, some data may live here that isnt directly needed for the project. 
+/tests/test_data
+these wont be saved to the github as they may be large and would just bloat it 

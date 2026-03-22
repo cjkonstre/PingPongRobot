@@ -104,8 +104,9 @@ int main() {
     std::string cam_intrinsics = "/home/connor/PingPongRobot/core/config/vision/video0-intrinsics.yml";
     loadCamera(cam_intrinsics);
 
-    cv::VideoCapture cap(cam_path);
-    //cap.set(cv::CAP_PROP_FPS, 120);
+    cv::VideoCapture cap(cam_path, cv::CAP_V4L2);
+    cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G'));
+    cap.set(cv::CAP_PROP_FPS, 30);
     if (!cap.isOpened()) return -1;
 
     auto dict = cv::aruco::getPredefinedDictionary(
@@ -122,7 +123,8 @@ int main() {
 
     while (true){
         cv::Mat frame;
-        cap >> frame;
+        cap.grab();        // drop frame
+        cap.retrieve(frame);
         if (frame.empty()) break;
 
         cv::aruco::detectMarkers(frame, dict, corners, ids);
@@ -158,7 +160,6 @@ int main() {
 
                 //for (double pos: pose.pos)std::cout << pos << ", ";
                 //std::cout <<  "theta: " << pose.ori.theta << "  phi: " << pose.ori.phi << "\r";
-
                 
                 double now = std::chrono::duration<double>(
                     std::chrono::steady_clock::now().time_since_epoch()

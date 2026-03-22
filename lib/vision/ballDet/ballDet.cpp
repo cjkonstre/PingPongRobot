@@ -184,9 +184,8 @@ bool BallDetector::findBall(
     const cv::Mat& im,
     cv::Point2f& center,
     float& rad,
-    bool dobg_masking, 
-    cv::Rect roi
-) {
+    bool dobg_masking
+) const {
     if(im.empty()) return false;
 
     cv::Mat frame;
@@ -255,14 +254,13 @@ bool BallDetector::findBall(
     return true;
 }
 
-inline bool findBall(
+bool BallDetector::findBall(
         const cv::Mat& im,
         cv::Point2f& center,
         float& rad,
-        bool dobg_masking,
         cv::Rect roi
-) {
-    bool found = findBall(im(roi), center, rad, dobg_masking);
+) const {
+    bool found = findBall(im(roi), center, rad, false);
 
     if(found) {
         center.x += roi.x;

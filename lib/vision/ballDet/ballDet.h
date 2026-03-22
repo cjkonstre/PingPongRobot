@@ -11,6 +11,13 @@ class BallDetector {
 public:
     explicit BallDetector(const std::string& configPath, const std::string& camName);
     bool findBall(const cv::Mat& im, cv::Point2f& center, float& rad, bool dobg_masking = false);
+    inline bool findBall(
+        const cv::Mat& im,
+        cv::Point2f& center,
+        float& rad,
+        bool dobg_masking,
+        cv::Rect roi
+    );
 
 private:
     cv::Mat mu;      // 1x2
@@ -50,17 +57,16 @@ public:
         cv::Point2f& center,
         float& rad,
         bool dobg_masking = false
-    );
+    ) const;
 
     //only searches for the ball in the roi
     //careful that the center points to it in the full image, not the cropped
-    inline bool findBall(
+    bool findBall(
         const cv::Mat& im,
         cv::Point2f& center,
         float& rad,
-        bool dobg_masking,
         cv::Rect roi
-    );
+    ) const;
 };
 
 #endif

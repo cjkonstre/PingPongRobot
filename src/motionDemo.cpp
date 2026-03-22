@@ -75,11 +75,11 @@ int main() {
 
     //   this is a rotation test
     waitInput();
-    target.ori = {0, PI/4}; 
+    target.ori = {0, PI/8}; 
     mp.setTarget(target, Pose0vels);
 
     waitInput();
-    target.ori = {0, -PI/4}; 
+    target.ori = {0, -PI/8}; 
     mp.setTarget(target, Pose0vels);
 
     waitInput();

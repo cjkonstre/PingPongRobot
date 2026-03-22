@@ -11,6 +11,7 @@
 using namespace cv;
 using namespace std;
 
+//please initialize counter clockwise pairs, ie BL-BR, BR-MR, MR-BL -- order matters!
 int main(int argc, char** argv) {
     auto kinConfig = load_configs(KINCONFIG_PATH);
     std::cout << "configs loaded\n";
@@ -35,7 +36,6 @@ int main(int argc, char** argv) {
 
     std::array<double, DOFS> home_qs = kin.doIK(home_pose.pos, home_pose.ori.n(), {0,0,0}, {0,0,0}).qs;
     doHoming_presetPos(*teensy, home_qs);
-    //kin done ^^
 
 
     string cam1Name = filesystem::path(argv[1]).filename();
@@ -54,6 +54,8 @@ int main(int argc, char** argv) {
     waitInput("begin");
 
     mp.begin(); //idlepos by default once started 
+
+    const float Zoffset = 29.365/1000;
 
     vector<Point2f> cap1points;
     vector<Point2f> cap2points;
@@ -102,7 +104,7 @@ int main(int argc, char** argv) {
             cap2points.push_back(ppxpos2);
             IRLpoints.push_back(Point3f(target.pos[0], 
                                         target.pos[1],
-                                        target.pos[2]));
+                                        target.pos[2]-Zoffset));
             cout << "captured!\n";
         }
     }
@@ -137,7 +139,7 @@ int main(int argc, char** argv) {
     std::cout << "relative rotation: " << rotation_deg << " deg\n";
 
     //should wrap this up into a stereo object. make the names a bit easier
-    string filename = "/home/connor/PingPongRobot/core/config/vision/" + cam1Name + "+" + cam2Name + "-stereoExtrinsics";
+    string filename = "/home/connor/PingPongRobot/core/config/vision/" + cam1Name + "-" + cam2Name + "-stereoConf";
     FileStorage fs(filename, FileStorage::WRITE);
     fs << "R" << R;
     fs << "T" << T;

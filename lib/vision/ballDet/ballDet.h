@@ -3,7 +3,7 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 
-#define DO_MAHALANOBIS
+//#define DO_MAHALANOBIS
 
 #ifndef DO_MAHALANOBIS
 //gaussian model
@@ -11,13 +11,11 @@ class BallDetector {
 public:
     explicit BallDetector(const std::string& configPath, const std::string& camName);
     bool findBall(const cv::Mat& im, cv::Point2f& center, float& rad, bool dobg_masking = false);
-    inline bool findBall(
+    bool findBall(
         const cv::Mat& im,
         cv::Point2f& center,
         float& rad,
-        bool dobg_masking,
-        cv::Rect roi
-    );
+        cv::Rect roi);
 
 private:
     cv::Mat mu;      // 1x2

@@ -16,22 +16,17 @@ TriStereo::TriStereo(Camera& camera1, Camera& camera2, Camera& camera3, BallDete
 //synch reads from all cams, parallely reads and dets ball
 //inline void det3Fast_asynchronous -- be careful about nested threading, cv funcs used in findball might already be threaded
 
+std::array<cv::Mat, 3> TriStereo::getAlignedFrames(float thresh) { //rn nothing fancy, just returns the most recent. worst case is a mismatch of 10 ish ms
+    return {cam1.frame_buffer[0].frame, cam2.frame_buffer[0].frame, cam3.frame_buffer[0].frame};
+}
+
 GaussBlob<3> TriStereo::getMeasurement() { // not entirely sure, if moving the timing of the cap/det around, may need to change this up
-    cam1.grab(); cam2.grab(); cam3.grab();
-    cv::Mat im1, im2, im3;
-
-    auto f1 = std::async(std::launch::async, [&]{ cam1.retrieve(im1); });
-    auto f2 = std::async(std::launch::async, [&]{ cam2.retrieve(im2); });
-    auto f3 = std::async(std::launch::async, [&]{ cam3.retrieve(im3); });
-
-    f1.get();
-    f2.get();
-    f3.get();
+    auto frames = getAlignedFrames();
 
     cv::Point2f c1, c2, c3; float r;
-    balldet.findBall(im1, c1, r, true);
-    balldet.findBall(im2, c2, r, true);
-    balldet.findBall(im3, c3, r, true);
+    balldet.findBall(frames[0], c1, r);
+    balldet.findBall(frames[1], c2, r);
+    balldet.findBall(frames[2], c3, r);
 
     return st1.get3dMeasurement(c1, c2) * st2.get3dMeasurement(c2, c3) * st3.get3dMeasurement(c3, c1);
 }
@@ -93,16 +88,7 @@ inline void project_gaussian3(
 }
 
 GaussBlob<3> TriStereo::getMeasurement(const GaussBlob<3>& predicted, float uncertaintyF) {
-    cam1.grab(); cam2.grab(); cam3.grab();
-    cv::Mat im1, im2, im3;
-
-    auto f1 = std::async(std::launch::async, [&]{ cam1.retrieve(im1); });
-    auto f2 = std::async(std::launch::async, [&]{ cam2.retrieve(im2); });
-    auto f3 = std::async(std::launch::async, [&]{ cam3.retrieve(im3); });
-
-    f1.get();
-    f2.get();
-    f3.get();
+    auto frames = getAlignedFrames();
 
     cv::Rect2f rois[3]; //predictive rois. should speed up ball detection significantly
     project_gaussian3(
@@ -113,9 +99,9 @@ GaussBlob<3> TriStereo::getMeasurement(const GaussBlob<3>& predicted, float unce
     );
 
     cv::Point2f c1, c2, c3; float r;
-    balldet.findBall(im1, c1, r, rois[0]);
-    balldet.findBall(im2, c2, r, rois[1]);
-    balldet.findBall(im3, c3, r, rois[2]);
+    balldet.findBall(frames[0], c1, r, rois[0]);
+    balldet.findBall(frames[1], c2, r, rois[1]);
+    balldet.findBall(frames[2], c3, r, rois[2]);
 
     return st1.get3dMeasurement(c1, c2) * st2.get3dMeasurement(c2, c3) * st3.get3dMeasurement(c3, c1);
 }

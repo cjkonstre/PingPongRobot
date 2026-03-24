@@ -7,6 +7,7 @@
 #include <linux/videodev2.h>
 #include <Eigen/Dense>
 #include <opencv2/core/eigen.hpp>
+#include <string>
 
 
 void Camera::makeProjection(
@@ -29,40 +30,12 @@ void Camera::makeProjection(
     cv::eigen2cv(P, proj);
 }
 
-static void setControl(int fd, int id, int value)
-{
-    v4l2_control ctrl{};
-    ctrl.id = id;
-    ctrl.value = value;
-
-    if (ioctl(fd, VIDIOC_S_CTRL, &ctrl) < 0) perror("VIDIOC_S_CTRL");
-}
-
 Camera::Camera(const std::string& capPath,
-               const std::string& intrinsicsPath,
-               int frameWidth,
-               int frameHeight,
-               int fps,
-               int exposureSetting)
-    : capPath(capPath), capName(std::filesystem::path(capPath).filename()),
+               const std::string& intrinsicsPath)
+               : capPath(capPath), capName(std::filesystem::path(capPath).filename()),
     frame_buffer(frameBuffer_len)
 {
-    cap.open(capPath);
-
-    if (!cap.isOpened())
-        throw std::runtime_error("Failed to open camera: " + capPath);
-
-    cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G'));
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, frameWidth);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, frameHeight);
-    cap.set(cv::CAP_PROP_FPS, fps);
-    cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
-    int fd = open(capPath.c_str(), O_RDWR);
-    if (fd >= 0) {
-        setControl(fd, V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL);
-        setControl(fd, V4L2_CID_EXPOSURE_ABSOLUTE, exposureSetting);
-        close(fd);
-    }
+    cap.open(capPath); if (!cap.isOpened()) throw std::runtime_error("Failed to open camera: " + capPath);
 
     cv::FileStorage fs(intrinsicsPath, cv::FileStorage::READ);
     if (!fs.isOpened()) throw std::runtime_error("Failed to open intrinsics file: " + intrinsicsPath);
@@ -71,6 +44,25 @@ Camera::Camera(const std::string& capPath,
     fs.release();
 
     frame_buffer.assign(frameBuffer_len, Frame{cv::Mat(), 0});
+}
+
+Camera::Camera(const std::string& capPath,
+               const std::string& intrinsicsPath,
+               int frameWidth,
+               int frameHeight,
+               int fps,
+               int exposureSetting)
+               : Camera(capPath, intrinsicsPath)
+{
+    cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G'));
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, frameWidth);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, frameHeight);
+    cap.set(cv::CAP_PROP_FPS, fps);
+    cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
+
+    const std::string command = "v4l2-ctl -d ";
+    std::system((command+capPath+" -c auto_exposure=1").c_str());
+    std::system((command+capPath+" --set-ctrl=exposure_time_absolute="+ std::to_string(exposureSetting)).c_str());
 }
 
 void Camera::beginLoop() {
@@ -92,8 +84,6 @@ void Camera::beginLoop() {
                 std::chrono::steady_clock::now().time_since_epoch()
             ).count();
 
-            std::cout << capName << " got photo @ " << ts << ' ';
-
             { //scope block, so mutex gets destructed
             std::lock_guard<std::mutex> lock(frame_buffer_mutex);
             if (frame_buffer.full()) frame_buffer.pop_front(); //so it overwrites
@@ -103,7 +93,16 @@ void Camera::beginLoop() {
     });
 }
 
-void Camera::beginRecordingLoop(const std::string& savedir) {
+void Camera::endLoop(){
+    if (!running.load()) return;
+    running.store(false);
+    if (capture_thread.joinable()) capture_thread.join();
+
+    endRecordingLoop();
+
+}
+
+void Camera::beginRecordingLoop(const std::string& savedir) { //a bit slow, not sure why
     if (running.load()) return;
 
     if (!cap.isOpened())std::cout << capName << " isnt opened on loop start. trying...\n";
@@ -157,10 +156,10 @@ void Camera::beginRecordingLoop(const std::string& savedir) {
 }
 
 void Camera::endRecordingLoop() {
+    if (!recording.load()) return;
     if (!running.load()) return;
     running.store(false);
-    if (capture_thread.joinable())
-        capture_thread.join();
+    if (capture_thread.joinable()) capture_thread.join();
 
     writer.release(); 
     tsldr.close();
@@ -169,3 +168,36 @@ void Camera::endRecordingLoop() {
 
     std::cout << capName << " recording stopped\n";
 }
+
+
+//also just opens the timestamp reader
+CameraRec::CameraRec(const std::string& capPath, const std::string& tspath, const std::string& intrinsicsPath) :
+    Camera(capPath, intrinsicsPath) //constructor that doesnt force any reading settings
+{ tsReader.open(tspath); if (!tsReader) throw std::runtime_error("Failed to open timestamps: " + tspath); }
+
+void CameraRec::release() {
+    tsReader.close();
+    Camera::release();
+}
+
+void CameraRec::blockingWait(uint64_t us) { //accurate to 200us. some hardcoded values in there but its fine
+    auto t_end = std::chrono::steady_clock::now() + std::chrono::microseconds(us);
+    std::this_thread::sleep_until(t_end - std::chrono::microseconds(2000)); //does innacurate sleep until a bit before
+    while (std::chrono::steady_clock::now() < t_end) {std::this_thread::sleep_for(std::chrono::microseconds(200));} //throttled
+}
+void CameraRec::blockingWaitNext() {
+    uint64_t ts;
+
+    // first frame uses preloaded timestamp
+    if (!started) { ts = first_ts; started = true;} 
+    else tsReader >> ts;
+
+    uint64_t rel = ts - first_ts;
+
+    auto target = start_time + std::chrono::microseconds(offset + rel);
+    std::this_thread::sleep_until(target);
+}
+
+//grab is unchanged. if works as it should
+bool CameraRec::retrieve(cv::Mat& frame) {blockingWaitNext(); return Camera::retrieve(frame);}
+bool CameraRec::read(cv::Mat& frame) {blockingWaitNext(); return Camera::read(frame);}

@@ -16,7 +16,7 @@ struct Frame {
 };
 
 class Camera {
-private:
+protected:
     std::string capPath;
     std::string intrinsicsPath;
 
@@ -46,6 +46,10 @@ public:
 
     std::string capName;
 
+    //no external settings to the rec device
+    Camera(const std::string& capPath, const std::string& intrinsicsPath); 
+
+    //sets controls on rec device
     Camera(const std::string& capPath,
            const std::string& intrinsicsPath,
            int frameWidth,
@@ -54,9 +58,9 @@ public:
            int exposureSetting);
 
     inline bool grab() {return cap.grab();}
-    inline bool retrieve(cv::Mat& frame) {return cap.retrieve(frame);}
-    inline bool read(cv::Mat& frame) {return cap.read(frame);}
-    inline void release() {endLoop(); cap.release();}
+    virtual inline bool retrieve(cv::Mat& frame) {return cap.retrieve(frame);}
+    virtual inline bool read(cv::Mat& frame) {return cap.read(frame);}
+    virtual inline void release() {endLoop(); cap.release();}
 
     static constexpr size_t frameBuffer_len = 5;
     boost::circular_buffer<Frame> frame_buffer{frameBuffer_len};
@@ -66,4 +70,32 @@ public:
 
     void beginRecordingLoop(const std::string& savedir);
     void endRecordingLoop();
+};
+
+//camera from rec. reads/simulates from a video rec. new constructor and oveloads the reading methods
+//pretends to be a camera, is 
+class CameraRec : public Camera {
+private:
+    static void blockingWait(uint64_t us);
+    void blockingWaitNext();
+
+    uint64_t prev_ts = 0;
+    bool started = false;
+    bool first_consumed = false;
+
+    
+public: 
+    uint64_t first_ts = 0;
+    uint64_t offset = 0;
+    std::ifstream tsReader; // ikik this isnt areospace code jeez
+    std::chrono::steady_clock::time_point start_time;
+    //^^IK this rly shouldnt be all exposed im SORRY
+
+    CameraRec(const std::string& recpath, 
+              const std::string& tspath,
+              const std::string& intrinsicsPath);
+
+    bool retrieve(cv::Mat& frame) override;
+    bool read(cv::Mat& frame) override;
+    void release() override;
 };

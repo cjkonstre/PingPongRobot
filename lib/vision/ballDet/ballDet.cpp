@@ -254,12 +254,14 @@ bool BallDetector::findBall(
     return true;
 }
 
+#endif
+
 bool BallDetector::findBall(
         const cv::Mat& im,
         cv::Point2f& center,
         float& rad,
         cv::Rect roi
-) const {
+) {
     bool found = findBall(im(roi), center, rad, false);
 
     if(found) {
@@ -269,7 +271,3 @@ bool BallDetector::findBall(
 
     return found;
 }
-
-
-
-#endif

@@ -1,6 +1,5 @@
 // script to save video and save it to a file
 
-
 #include "config/config.h"
 #include "utils.h"
 #include <opencv2/opencv.hpp>
@@ -12,9 +11,7 @@
 
 std::atomic<bool> stop(false);
 
-void signal_handler(int signal) {
-    if (signal == SIGINT) stop = true;
-}
+void signal_handler(int signal) { if (signal == SIGINT) stop = true;}
 
 int main() {
     std::signal(SIGINT, signal_handler);
@@ -23,9 +20,13 @@ int main() {
 
     Camera camBL("/dev/cam_BL", CONF_PATH + "vision/cam_BL-intrinsics.yml", 1280, 800, 120, 35);
     Camera camBR("/dev/cam_BR", CONF_PATH + "vision/cam_BR-intrinsics.yml", 1280, 800, 120, 35);
-    Camera camMR("/dev/cam_MR", CONF_PATH + "vision/cam_MR-intrinsics.yml", 1920, 1080, 90, 35);
+    Camera camMR("/dev/cam_MR", CONF_PATH + "vision/cam_MR-intrinsics.yml", 1920, 1080, 120, 300);
 
     std::cout << "starts recording..." << std::endl;
+
+    cv::Mat im;
+    camBL.read(im); camBL.read(im); camBL.read(im); //to synch all cams up and make sure theyre ready (?)
+    //someitmes first cap is a lil weird
 
     camBL.beginRecordingLoop(outdir);
     camBR.beginRecordingLoop(outdir);

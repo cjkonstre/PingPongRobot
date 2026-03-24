@@ -92,12 +92,12 @@ add_execs("${CMAKE_SOURCE_DIR}/tools"
 #tets
 add_execs("${CMAKE_SOURCE_DIR}/tests/kinematics"
   PREFIX "test_"
-  LIBS robotlibs ${UTIL_LIBS} ${KIN_LIBS} pthread
+  LIBS robotlibs core ${UTIL_LIBS} ${KIN_LIBS} pthread
 )
 
 add_execs("${CMAKE_SOURCE_DIR}/tests/vision"
   PREFIX "test_"
-  LIBS robotlibs ${UTIL_LIBS} ${VISION_LIBS}
+  LIBS robotlibs core ${UTIL_LIBS} ${VISION_LIBS} ${KIN_LIBS} 
 )
 
 # ===== Testing =====

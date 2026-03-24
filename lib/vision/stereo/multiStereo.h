@@ -16,6 +16,8 @@ private:
 public:
     TriStereo(Camera& cam1, Camera& cam2, Camera& cam3, BallDetector& balldet);
 
+    std::array<cv::Mat, 3> getAlignedFrames(float thresh = 1); // thresh dets how out of sunch -ness is acceptable. maybe dynamic, idk
+
     GaussBlob<3> getMeasurement(); //oh yeah
     GaussBlob<3> getMeasurement(const GaussBlob<3>& predicted, float uncertaintyF = 1); //predictive ROI
 };

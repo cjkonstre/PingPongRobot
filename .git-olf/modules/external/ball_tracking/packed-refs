@@ -1,0 +1,10 @@
+# pack-refs with: peeled fully-peeled sorted 
+1d0f65c5576daaac8f3ec1f16d01266cbeb129ec refs/remotes/origin/dev
+42d80ceaa448679f32053ec4c55d6c6272057b8a refs/remotes/origin/dev-raphael
+aee4d0438d8bc0a46bb3dab2ca4249e2e011878f refs/remotes/origin/master
+908be6af475b22d41c15d764b6fd9637170a6c84 refs/remotes/origin/raphaelcpp
+b1770e5381c3327be15072a62ccd53854f9f0d1b refs/remotes/origin/sebas_dev
+479e2319f0aa3f5b76238f4e50be8fe6b65b1acf refs/tags/ball_track_cpu
+^e3b7acabeebd5234789d78bf5e29fb98426946cb
+25dc8d1996887b7a798d1e0e819d5f8e0b97094e refs/tags/v1.0
+^46d1b813cd49a6e60650c92b40f61656e1253534

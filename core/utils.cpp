@@ -26,3 +26,19 @@ std::array<double, 3> randVector(std::array<double, 3> mins, std::array<double, 
     }
     return vect;
 }
+
+void synchCamrecsToNow(CameraRec& cam1, CameraRec& cam2, CameraRec& cam3){
+    cam1.tsReader >> cam1.first_ts;
+    cam2.tsReader >> cam2.first_ts;
+    cam3.tsReader >> cam3.first_ts;
+    uint64_t earlieststart = std::min({cam1.first_ts,  cam2.first_ts, cam3.first_ts});
+
+    cam1.offset = cam1.first_ts - earlieststart;
+    cam2.offset = cam2.first_ts - earlieststart;
+    cam3.offset = cam3.first_ts - earlieststart;
+
+    auto global_start_time = std::chrono::steady_clock::now();
+    cam1.start_time = global_start_time;
+    cam2.start_time = global_start_time;
+    cam3.start_time = global_start_time;
+}

@@ -151,3 +151,9 @@ the motion pather prematurely stops in its movement, ending with a non zero velo
 03/7 been working a lot. kin stopped working. acting rly rly srange, turns out it was some data transmittion error/mem error
   made mc confused
   revised vison so api better now.
+
+03/22 did a lot since last post, lots of hw tho. got robot working fantastically, showed it of to ppl. jitteryness and nush is due to 
+comms issues w/ the mc
+recently implemented recording func so it can be replayed and simulated as a cam and hone in detection
+
+03/23 added simulated camera

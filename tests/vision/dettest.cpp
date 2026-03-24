@@ -18,12 +18,11 @@ int main()
 
     cv::FileStorage fs(configPath, cv::FileStorage::READ);
     cv::Mat Sigma;
-    fs["mu"] >> mu;
-    fs["Sigma"] >> Sigma;
+    fs["cam_MR"]["mu"] >> mu;
+    fs["cam_MR"]["Sigma"] >> Sigma;
     fs.release();
 
-    if (mu.empty() || Sigma.empty())
-        throw runtime_error("Invalid model contents");
+    if (mu.empty() || Sigma.empty()) throw runtime_error("Invalid model contents");
 
     mu.convertTo(mu, CV_32F);
     Sigma.convertTo(Sigma, CV_32F);
@@ -32,7 +31,7 @@ int main()
 
     auto bgSub = cv::createBackgroundSubtractorMOG2(200, 16, false);
 
-    cv::VideoCapture cap("/dev/cam_BL");
+    cv::VideoCapture cap("/dev/cam_MR");
     if (!cap.isOpened())
         throw runtime_error("Failed to open camera");
 

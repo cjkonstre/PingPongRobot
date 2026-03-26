@@ -7,6 +7,7 @@
 
 //3 cams = 3 stereo pairs
 //does the stuff, doesnt interpret. returns measurement of the ball.
+//multistereo things arent in charge of initializing cameras. do that beforehand!! if frames are empty, thats probs why
 class TriStereo {
 private:
     static const std::string confpath;
@@ -18,6 +19,7 @@ public:
 
     std::array<cv::Mat, 3> getAlignedFrames(float thresh = 1); // thresh dets how out of sunch -ness is acceptable. maybe dynamic, idk
 
-    GaussBlob<3> getMeasurement(); //oh yeah
-    GaussBlob<3> getMeasurement(const GaussBlob<3>& predicted, float uncertaintyF = 1); //predictive ROI
+    int TriStereo::getMeasurement(GaussBlob<3>& measurement); //oh yeah
+    int GaussBlob<3> getMeasurement(GaussBlob<3>& measurement, 
+                                    const GaussBlob<3>& predicted, float uncertaintyF = 1); //predictive ROI
 };

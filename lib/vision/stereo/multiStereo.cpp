@@ -20,15 +20,26 @@ std::array<cv::Mat, 3> TriStereo::getAlignedFrames(float thresh) { //rn nothing 
     return {cam1.frame_buffer[0].frame, cam2.frame_buffer[0].frame, cam3.frame_buffer[0].frame};
 }
 
-GaussBlob<3> TriStereo::getMeasurement() { // not entirely sure, if moving the timing of the cap/det around, may need to change this up
+//supports partial success. if 1 fails doesnt send it all out the window
+//returns # of pairs succeeding. gonna be either 0, 1 or 3
+int TriStereo::getMeasurement(GaussBlob<3>& measurement) { // not entirely sure, if moving the timing of the cap/det around, may need to change this up
     auto frames = getAlignedFrames();
 
     cv::Point2f c1, c2, c3; float r;
-    balldet.findBall(frames[0], c1, r);
-    balldet.findBall(frames[1], c2, r);
-    balldet.findBall(frames[2], c3, r);
+    bool ret1 = balldet.findBall(frames[0], c1, r);
+    bool ret2 = balldet.findBall(frames[1], c2, r);
+    bool ret3 = balldet.findBall(frames[2], c3, r);
 
-    return st1.get3dMeasurement(c1, c2) * st2.get3dMeasurement(c2, c3) * st3.get3dMeasurement(c3, c1);
+    //this pre combination should work well enough. sensor noise and readings should be a correct fusion to work in kalman
+    if (ret1+ret2+ret3 < 2) return 0; //failed
+    if (ret1+ret2+ret3 == 3) { //all 3 succeeded
+        measurement = st1.get3dMeasurement(c1, c2) * st2.get3dMeasurement(c2, c3) * st3.get3dMeasurement(c3, c1);
+        return 3;
+    }
+    else if (!ret3) measurement = st1.get3dMeasurement(c1, c2);
+    else if (!ret2) measurement = st3.get3dMeasurement(c3, c1);
+    else if (!ret1) measurement = st2.get3dMeasurement(c2, c3);
+    return 1;
 }
 
 inline void project_gaussian3(
@@ -87,7 +98,7 @@ inline void project_gaussian3(
     }
 }
 
-GaussBlob<3> TriStereo::getMeasurement(const GaussBlob<3>& predicted, float uncertaintyF) {
+int TriStereo::getMeasurement(GaussBlob<3>& measurement, const GaussBlob<3>& predicted, float uncertaintyF) {
     auto frames = getAlignedFrames();
 
     cv::Rect2f rois[3]; //predictive rois. should speed up ball detection significantly
@@ -99,9 +110,17 @@ GaussBlob<3> TriStereo::getMeasurement(const GaussBlob<3>& predicted, float unce
     );
 
     cv::Point2f c1, c2, c3; float r;
-    balldet.findBall(frames[0], c1, r, rois[0]);
-    balldet.findBall(frames[1], c2, r, rois[1]);
-    balldet.findBall(frames[2], c3, r, rois[2]);
+    bool ret1 = balldet.findBall(frames[0], c1, r, rois[0]);
+    bool ret2 = balldet.findBall(frames[1], c2, r, rois[1]);
+    bool ret3 = balldet.findBall(frames[2], c3, r, rois[2]);
 
-    return st1.get3dMeasurement(c1, c2) * st2.get3dMeasurement(c2, c3) * st3.get3dMeasurement(c3, c1);
+    if (ret1+ret2+ret3 < 2) return 0; //failed
+    if (ret1+ret2+ret3 == 3) { //all 3 succeeded
+        measurement = st1.get3dMeasurement(c1, c2) * st2.get3dMeasurement(c2, c3) * st3.get3dMeasurement(c3, c1);
+        return 3;
+    }
+    else if (!ret3) measurement = st1.get3dMeasurement(c1, c2);
+    else if (!ret2) measurement = st3.get3dMeasurement(c3, c1);
+    else if (!ret1) measurement = st2.get3dMeasurement(c2, c3);
+    return 1;
 }

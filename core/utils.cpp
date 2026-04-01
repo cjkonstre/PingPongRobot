@@ -42,3 +42,4 @@ void synchCamrecsToNow(CameraRec& cam1, CameraRec& cam2, CameraRec& cam3){
     cam2.start_time = global_start_time;
     cam3.start_time = global_start_time;
 }
+

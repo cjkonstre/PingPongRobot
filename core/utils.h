@@ -14,4 +14,7 @@ void doHoming_presetPos(MotorController& controller, const std::array<double, DO
 std::array<double, 3> randVector(std::array<double, 3> mins, std::array<double, 3> maxs);
 
 constexpr Pose Pose0vels{{0, 0, 0}, {0, 0}};
+
+
 void synchCamrecsToNow(CameraRec& cam1, CameraRec& cam2, CameraRec& cam3);
+

@@ -22,11 +22,10 @@ class KalmanModel {
     double dt;
 
     Eigen::Matrix<double, 6, 3> get_kalmanGain(const Eigen::Matrix<double, 3, 3>& sensor_noise) const; //returns simplified kalman gain (K'), dependent on currect covariant matrix
-
-    Eigen::Matrix<double, 6, 1> predict_state() const; // w/ dt
-    Eigen::Matrix<double, 6, 6> predict_covariance() const; // w/ dt
 public:
     KalmanModel(const double& noise_sigma, const double& dt); //3d etimation noise, process noise
+
+    void predict(); // w/ dt
 
     void apply_mat(Eigen::Matrix<double, 6, 6> mat); //for sudden changes, ie bouncing
 
@@ -35,6 +34,5 @@ public:
 
     void set_dt(const double& dt); //sets all relevant matricies as well to match dt timestep
 
-    void update(const Eigen::Matrix<double, 3, 1>& measurement_mu, const Eigen::Matrix<double, 3, 3>& measurement_cov); //updates internal state w/ measurement, w/ dt
-    void update(); //updates internals w/o measurement.
+    void combine(const Eigen::Matrix<double, 3, 1>& measurement_mu, const Eigen::Matrix<double, 3, 3>& measurement_cov); //updates internal state w/ measurement, w/ dt
 };

@@ -11,6 +11,7 @@
 
 #include "gaussianBlob.h"
 #include "player/kalmanFilter/kalmanFilter.h"
+#include <algorithm>
 
 #include "config/config.h"
 #include "utils.h"
@@ -62,16 +63,59 @@ int main() {
     std::signal(SIGINT, signal_handler); 
     //code VV
     
-    kalmanFilter filter(process_noise, dt);
-    Eigen::Matrix<double, 6, 1>& ball_state = filter.state;
+    KalmanModel filter(process_noise, dt); //only use to incorporate measurements
 
     //main loop
+    Pose target;
+    Pose targetVels;
     while (mainLooping.load(std::memory_order_relaxed)) {
-        filter.predict();
-        if (filter.state.z < 0) filter.apply_mat(table_bounce_mat);
+        filter.predict(); if (filter.state.z < 0) filter.apply_mat(table_bounce_mat);
+        GaussBlob<3> measurement; if (vis.getMeasurement(measurement)) 
+            filter.combine(measurement);
         
-        GaussBlob<3> measurement; 
-        if (vis.getMeasurement(measurement)) filter.combine(measurement);
+        //player code
+        Eigen::Vector6f ball_state = filter.state; //copies it, no auto
+        Eigen::Vector3f ball_pos = ball_state.segment(0, 3); Eigen::Vector3f ball_vel = ball_state.segment(3, 3); //'references'
+        if (ball_vel(1) < 0){ //ball is coming towards the robot, needs to return it
+            //loop through timesteps of the flight path and assign how good of a time to make that shot would be
+            //could def do this in a single run, via a more complicated network
+            Eigen::Vector3f best_u;
+            Eigen::Vector3f best_p;
+            float best_T;
+            float best_score;
+            std::vector<double> scores; //asign values to it
+            double dt_forward = dt*2; // timestep accuracy
+            for (int i = 0; i<100; i++){
+                ball_state = player.dynamics.forward(ball_state, dt_forward);
+                if (ball_pos(1) < -1._ft) break; //past back
+                if (ball_pos(0) < -0.5_ft || ball_pos(0, 0) < TABLE_WIDTH+ 0.5_ft) break; //past sides
+
+                //figure out best target/return from this angle
+                //for now constant
+                Eigen::Vector3f shot_target(TABLE_WIDTH/2, 3/2*TABLE_LENGTH, 0);
+                float T_return = 1.5; //s
+
+                Eigen::Vector3f v_prime = player.dynamics.backward_P0_T_P1(ball_pos, T_return, shot_target);
+                
+                Eigen::Vector3f u_vec = player.calc_u(ball_vel, v_prime); //reflection angle+vel
+
+                float score = u_vec.mag(); //rated on velocity of paddle.
+                if !(score<best_score) continue;
+                //is better
+                best_T = i*dt_forward; 
+                best_p = ball_pos;
+                best_u = u_vec;
+            }
+
+            std::copy(best_p.data(), best_p.data() + best_p.size(), target.pos.begin());
+            target.ori = Pose::Orientation::from_normal(u_vec.normalized());
+            std::copy(best_u.data(), best_u.data() + best_u.size(), targetVels.pos.begin());
+            targetVels.ori = {0, 0};
+
+            mp.setTarget(target, targetVels);
+        } else { //ball is going away from robot, do something. go idepos?
+            mp.setTarget(idle_pose, Pose0vels);
+        }
 
         //do something smart with ball_state
     } std::cout << "exited \n"

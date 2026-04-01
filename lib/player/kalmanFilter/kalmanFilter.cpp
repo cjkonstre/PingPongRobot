@@ -6,25 +6,15 @@ Eigen::Matrix<double, 6, 3> KalmanModel::get_kalmanGain(const Eigen::Matrix<doub
 }
 
 
-void update(const Eigen::Matrix<double, 3, 1>& measurement_mu, const Eigen::Matrix<double, 3, 3>& measurement_cov) {
+void combine(const Eigen::Matrix<double, 3, 1>& measurement_mu, const Eigen::Matrix<double, 3, 3>& measurement_cov) {
     auto K = get_kalmanGain(measurement_cov);
-    auto x_k = predict_state();
-    auto P_k = predict_covariance();
 
-    state = x_k+K*(measurement_mu-sensor_model*x_k);
-    covariance_mat = P_k-K*sensor_model*P_k;
+    state = state+K*(measurement_mu-sensor_model*state);
+    covariance_mat = covariance_mat-K*sensor_model*covariance_mat;
 }
-
-void KalmanModel::update() {
-    state = predict_state();
-    covariance_mat = predict_covariance();
-}
-
-Eigen::Matrix<double, 6, 1> KalmanModel::predict_state() const {
-    return predict_mat*state+control_mat*control_vec;
-}
-Eigen::Matrix<double, 6, 6> KalmanModel::predict_covariance() const {
-    return predict_mat*covariance_mat*predict_mat.transpose()+noise_covariance;
+void KalmanModel::predict() {
+    state = predict_mat*state+control_mat*control_vec;
+    covariance_mat= predict_mat*covariance_mat*predict_mat.transpose()+noise_covariance;
 }
 
 void KalmanModel::apply_mat(Eigen::Matrix<double, 6, 6> mat) {

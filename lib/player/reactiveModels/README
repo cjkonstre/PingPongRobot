@@ -1,0 +1,18 @@
+honestly not sure how these shoul function. all depends on loop
+just place where `current_state -> target`
+could be trained CNN style
+
+things it needs to do
+ predict ball motion from current state
+ respond
+ie current_state -> predict -> ?? -> target
+
+main free parameters are related to 
+    when do you hit it
+    and how you hit it = where it goes + how it gets there
+what decides those free params is where the bulk of the sophistication will lie
+
+figure out response, ie where + how to hit it
+predict path
+attach some value, corresponding to how good of a time to hit it is for the response, to the path
+choose best time and figure out how to hit it

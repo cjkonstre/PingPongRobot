@@ -3,18 +3,6 @@
 #include "kinematics/SCComms/packet.h"
 #include "misc/timeLog/timeLog.hpp"
 
-#define START_TIME using std::chrono::high_resolution_clock; \
-                    using std::chrono::duration_cast; \
-                    using std::chrono::duration; \
-                    using std::chrono::milliseconds; \
-                    auto timing_nonameconflict_t1 = high_resolution_clock::now(); \
-
-#define PRINT_TIME auto timing_nonameconflict_t2 = high_resolution_clock::now(); \
-                    auto ms_int = duration_cast<milliseconds>(timing_nonameconflict_t2 - timing_nonameconflict_t1); \
-                    duration<double, std::milli> ms_double = timing_nonameconflict_t2 - timing_nonameconflict_t1; \
-                    std::cout << ms_double.count() * 1000<< "us\n"; \
-
-
 template <typename MC, typename KS>
 MotionPather<MC, KS>::MotionPather(
         double control_cycle_us,
@@ -146,8 +134,6 @@ while (running.load(std::memory_order_acquire)) {
         {input.current_velocity[0], input.current_velocity[1], input.current_velocity[2]},
         Dnormal
     ).qs;
-
-    //PRINT_TIME //for timing of the whole IK cycle
 
     PosFrameD<7> frame;
     frame.index = 1;

@@ -1,58 +1,38 @@
 #include "vision/camera/camera.h"
+
 #include <filesystem>
 #include <stdexcept>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
-#include <Eigen/Dense>
-#include <opencv2/core/eigen.hpp>
 #include <string>
 
 
-void Camera::makeProjection(
-    const cv::Mat& Kcv,
-    const cv::Mat& Rcv,
-    const cv::Mat& Tcv)
-{
-    Eigen::Matrix3d K, R;
-    Eigen::Vector3d t;
-
-    cv::cv2eigen(Kcv, K);
-    cv::cv2eigen(Rcv, R);
-    cv::cv2eigen(Tcv, t);
-
-    Eigen::Matrix<double,3,4> Rt;
-    Rt.block<3,3>(0,0) = R;
-    Rt.col(3) = t;
-
-    Eigen::Matrix<double,3,4> P = K * Rt;
-    cv::eigen2cv(P, proj);
-}
-
 Camera::Camera(const std::string& capPath,
-               const std::string& intrinsicsPath)
-               : capPath(capPath), capName(std::filesystem::path(capPath).filename()),
+               const std::string& caliPath)
+               : caliPath(caliPath), capPath(capPath), capName(std::filesystem::path(capPath).filename()),
     frame_buffer(frameBuffer_len)
 {
     cap.open(capPath); if (!cap.isOpened()) throw std::runtime_error("Failed to open camera: " + capPath);
 
-    cv::FileStorage fs(intrinsicsPath, cv::FileStorage::READ);
-    if (!fs.isOpened()) throw std::runtime_error("Failed to open intrinsics file: " + intrinsicsPath);
-    fs["camera_matrix"] >> intrinsics.K;
-    fs["dist_coeffs"] >> intrinsics.D;
+    cv::FileStorage fs(caliPath, cv::FileStorage::READ);
+    if (!fs.isOpened()) throw std::runtime_error("failed to open cali file: " + caliPath);
+    fs["camera_matrix"] >> K;
+    fs["dist_coeffs"] >> D;
+    fs["cam_proj"] >> H; //sensor matrix, H in kalman
     fs.release();
 
     frame_buffer.assign(frameBuffer_len, Frame{cv::Mat(), 0});
 }
 
 Camera::Camera(const std::string& capPath,
-               const std::string& intrinsicsPath,
+               const std::string& caliPath,
                int frameWidth,
                int frameHeight,
                int fps,
                int exposureSetting)
-               : Camera(capPath, intrinsicsPath)
+               : Camera(capPath, caliPath)
 {
     cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G'));
     cap.set(cv::CAP_PROP_FRAME_WIDTH, frameWidth);
@@ -171,8 +151,8 @@ void Camera::endRecordingLoop() {
 
 
 //also just opens the timestamp reader
-CameraRec::CameraRec(const std::string& capPath, const std::string& tspath, const std::string& intrinsicsPath) :
-    Camera(capPath, intrinsicsPath) //constructor that doesnt force any reading settings
+CameraRec::CameraRec(const std::string& capPath, const std::string& tspath, const std::string& caliPath) :
+    Camera(capPath, caliPath) //constructor that doesnt force any reading settings
 { tsReader.open(tspath); if (!tsReader) throw std::runtime_error("Failed to open timestamps: " + tspath); }
 
 void CameraRec::release() {

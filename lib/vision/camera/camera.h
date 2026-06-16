@@ -15,10 +15,12 @@ struct Frame {
     uint64_t timestamp_us;
 };
 
+//sensor class. holds information about itself
+//also handles information input
 class Camera {
 protected:
     std::string capPath;
-    std::string intrinsicsPath;
+    std::string caliPath;
 
     cv::VideoCapture cap;
 
@@ -32,31 +34,31 @@ protected:
 
     mutable std::mutex frame_buffer_mutex; //fancy mutable keyword wow
 public:
-    struct Intrinsics {
-        cv::Mat K;   // camera atrix
-        cv::Mat D;   // distotion coefficients
-    };
-
-    cv::Mat proj; //has dedicated initializer
-    void makeProjection(const cv::Mat& Kcv,
-                                        const cv::Mat& Rcv,
-                                        const cv::Mat& Tcv);
-
-    Intrinsics intrinsics;
-
     std::string capName;
 
+    //sensor info
+    cv::Mat K;   // camera matrix 
+    cv::Mat D;   // distortion coefficients
+
+    cv::Mat H;   // extrinsic
+    //sensor error is not part of camera, its part of the ball det
+
+    //instantiations
+
     //no external settings to the rec device
-    Camera(const std::string& capPath, const std::string& intrinsicsPath); 
+    Camera(const std::string& capPath, const std::string& caliPath); 
 
     //sets controls on rec device
     Camera(const std::string& capPath,
-           const std::string& intrinsicsPath,
+           const std::string& caliPath,
            int frameWidth,
            int frameHeight,
            int fps,
            int exposureSetting);
 
+    
+    //data grabbing
+    
     inline bool grab() {return cap.grab();}
     virtual inline bool retrieve(cv::Mat& frame) {return cap.retrieve(frame);}
     virtual inline bool read(cv::Mat& frame) {return cap.read(frame);}
@@ -93,7 +95,7 @@ public:
 
     CameraRec(const std::string& recpath, 
               const std::string& tspath,
-              const std::string& intrinsicsPath);
+              const std::string& caliPath);
 
     bool retrieve(cv::Mat& frame) override;
     bool read(cv::Mat& frame) override;

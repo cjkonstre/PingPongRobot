@@ -157,3 +157,8 @@ comms issues w/ the mc
 recently implemented recording func so it can be replayed and simulated as a cam and hone in detection
 
 03/23 added simulated camera
+
+
+6/14 been a while, make the motion react better. aded 3d viz, looks great. robot is super fast, microstep counts do need to be optimised
+  jerk is the main thing causing skipping and allat. might reduce pulley diameter for more torque
+changing vision system so its simpler and better

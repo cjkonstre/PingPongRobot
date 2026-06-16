@@ -34,6 +34,7 @@ BallDetector::BallDetector(const std::string& configPath, const std::string& cam
     const auto& cam = config.at(camName);
     mu    = jsonToMat(cam["mu"]);
     Sigma = jsonToMat(cam["Sigma"]);
+    sensorNoise = jsonToMat(cam["det_noise"]);
 
     if (mu.empty() || Sigma.empty()) throw std::runtime_error("Invalid model contents");
 

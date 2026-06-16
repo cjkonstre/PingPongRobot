@@ -117,8 +117,8 @@ int main(int argc, char** argv) {
         IRLpoints,
         cap1points,
         cap2points,
-        cam1.intrinsics.K, cam1.intrinsics.D,
-        cam2.intrinsics.K, cam2.intrinsics.D,
+        cam1.K, cam1.D,
+        cam2.K, cam2.D,
         imsize, //idk, set to 1st cam
         R, T, E, F,
         cv::CALIB_FIX_INTRINSIC,

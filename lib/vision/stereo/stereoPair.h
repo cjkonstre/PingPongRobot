@@ -20,6 +20,29 @@ public:
 
     GaussBlob<3> get3dMeasurement(const cv::Point2f& center1, const cv::Point2f& center2);
 
+    //solver
+    static bool calibratePnP(
+        const std::vector<cv::Point3f>& objectPoints,
+        const std::vector<cv::Point2f>& imagePoints1,
+        const std::vector<cv::Point2f>& imagePoints2,
+        const Camera& cam1,
+        const Camera& cam2,
+        cv::Mat& R,
+        cv::Mat& T,
+        cv::Mat& E,
+        cv::Mat& F
+    );
+
+    //solver, but saves cali to file directl
+    static bool calibrateToFile(
+        const std::vector<cv::Point3f>& objectPoints,
+        const std::vector<cv::Point2f>& imagePoints1,
+        const std::vector<cv::Point2f>& imagePoints2,
+        Camera& cam1,
+        Camera& cam2,
+        const std::string& outputPath
+    );
+
     StereoPair(const StereoPair&) = delete;
     StereoPair& operator=(const StereoPair&) = delete;
 };

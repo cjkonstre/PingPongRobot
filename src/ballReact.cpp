@@ -9,12 +9,14 @@
 #include "vision/ballDet/ballDet.h"
 #include "vision/stereo/multiStereo.h"
 
-#include "gaussianBlob.h"
+#include "misc/gaussianBlob.h"
 #include "player/kalmanFilter/kalmanFilter.h"
 #include <algorithm>
 
 #include "config/config.h"
 #include "utils.h"
+
+#include "misc/3dRenderer/3dRenderer.h"
 
 //for program halts
 std::atomic<bool> mainLooping(false); void signal_handler(int signal) {if(signal==SIGINT)mainLooping=true;}
@@ -60,6 +62,8 @@ int main() {
     camBR.beginLoop();
     camMR.beginLoop();
     mp.begin();
+    viz3d::begin();
+
     std::signal(SIGINT, signal_handler); 
     //code VV
     
@@ -117,13 +121,25 @@ int main() {
             mp.setTarget(idle_pose, Pose0vels);
         }
 
-        //do something smart with ball_state
-    } std::cout << "exited \n"
+        //viz
+        viz3d::begin();
+
+        renderUtils::drawAxes();
+        renderUtils::drawTable();
+        
+        if (mp.getSnapshot().valid) renderUtils::drawPaddle(kin, mp.getSnapshot().position, 
+                                                                 mp.getSnapshot().normal, 
+                                                                 mp.getSnapshot().velocity);
+
+
+    } std::cout << "exited \n";
 
     //code ^^
     waitInput("end"); //cleanup VV
     mp.setTarget(home_pose, Pose0vels, 2.5); sleep(3);
     mp.stop(); //ends mp loop
+
+    viz3d::end();
 
     camBL.release(); //end cam loops
     camBR.release();

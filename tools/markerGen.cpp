@@ -7,12 +7,12 @@
 
 int main() {
     cv::Mat markerImage;
-    cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_250);
+    cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
 
-    int mkrId = 23;
+    int mkrId = 21;
     cv::aruco::drawMarker(dictionary, mkrId, 200, markerImage, 1);
-    std::string imn = "marker" + std::to_string(mkrId) + ".png";
-    cv::imwrite("/home/cjk/PingPongRobot/markers/"+imn, markerImage);
+    std::string imn = "4X4_50-" + std::to_string(mkrId) + ".png";
+    cv::imwrite("/home/connor/PingPongRobot/core/assets/markers/"+imn, markerImage); //MAKE SURE TO ALIGN
     cv::waitKey();
 
     return 0;

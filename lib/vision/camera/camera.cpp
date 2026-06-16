@@ -52,7 +52,7 @@ Camera::Camera(const std::string& capPath,
                int frameHeight,
                int fps,
                int exposureSetting)
-               : Camera(capPath, intrinsicsPath)
+: Camera(capPath, intrinsicsPath)
 {
     cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G'));
     cap.set(cv::CAP_PROP_FRAME_WIDTH, frameWidth);
@@ -62,7 +62,7 @@ Camera::Camera(const std::string& capPath,
 
     const std::string command = "v4l2-ctl -d ";
     std::system((command+capPath+" -c auto_exposure=1").c_str());
-    std::system((command+capPath+" --set-ctrl=exposure_time_absolute="+ std::to_string(exposureSetting)).c_str());
+    std::system((command+capPath+" -c exposure_time_absolute="+ std::to_string(exposureSetting)).c_str());
 }
 
 void Camera::beginLoop() {
@@ -73,7 +73,6 @@ void Camera::beginLoop() {
 
     capture_thread = std::thread([this]() {
         cv::Mat frame; frame.reserve(1);
-
 
         while (running.load(std::memory_order_relaxed)) {
             if (!cap.isOpened()) continue;
@@ -192,7 +191,7 @@ void CameraRec::blockingWaitNext() {
     if (!started) { ts = first_ts; started = true;} 
     else tsReader >> ts;
 
-    uint64_t rel = ts - first_ts;
+    uint64_t rel = (ts - first_ts)*speed_modulation;
 
     auto target = start_time + std::chrono::microseconds(offset + rel);
     std::this_thread::sleep_until(target);

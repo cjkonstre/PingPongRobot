@@ -1,2 +1,9 @@
 not as general as /lib, but still used by multiple things in src
 project specific shared code
+
+runtime dir is meant for initialization code that has some extra complications to it,
+so like setting up simmed cameras or stub motorcontroller
+things that are and will be the same should be kept in the /src/ code, like for ex 
+    stopping cameras and such. 
+
+balance between morphism on different executable code, or same code w/ different inits

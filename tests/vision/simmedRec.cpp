@@ -12,12 +12,11 @@ BallDetector balldet(DETCONFIG_PATH, "cam_BL"); //doing bl, idk if i want to kee
 void dothething(Frame frame, std::string name){
     if (frame.timestamp_us == 0 || frame.frame.empty()) return;
     cv::Mat im = frame.frame.clone();
-\
 
     cv::Point2f c; float r;
-    balldet.findBall(im, c, r); 
+    //balldet.findBall(im, c, r); 
 
-    cv::circle(im, c, r, (0, 255, 0), 5);
+    //cv::circle(im, c, r, (0, 255, 0), 5);
     cv::imshow(name, im);
 }
 

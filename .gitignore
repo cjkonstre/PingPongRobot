@@ -407,4 +407,3 @@ MigrationBackup/
 
 out/
 .vscode/
-tests/test_data/

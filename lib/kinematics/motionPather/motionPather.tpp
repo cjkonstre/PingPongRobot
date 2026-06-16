@@ -184,10 +184,23 @@ while (running.load(std::memory_order_acquire)) {
             setTarget(idlePose, Pose{{0, 0, 0}, {0, 0}}); //if go home on idle, set that as target. should loop this in
         } else {blockingWait(next_tick, waittime, frame);}
 
-        }
+    }
 
+    //set up current pose exposing
+    // in your loop, after computing normal/velocity:
+    MotionExpose* back = snapBack.load(std::memory_order_relaxed);
+    back->position = {input.current_position[0], input.current_position[1], input.current_position[2]};
+    back->velocity = {input.current_velocity[0], input.current_velocity[1], input.current_velocity[2]};
+    back->acceleration = {input.current_acceleration[0], input.current_acceleration[1], input.current_acceleration[2]};
+    back->normal   = normal;
+    back->valid    = true;
+
+    // publish: swap front <-> back
+    back = snapFront.exchange(back, std::memory_order_acq_rel);
+    snapBack.store(back, std::memory_order_relaxed);
+    
     std::this_thread::sleep_until(next_tick); //will have a delay on one control cycle after the idle waiting. 1-5ms reaction delay isnt a huge deal
-}
+    }
 
 }
 

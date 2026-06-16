@@ -22,6 +22,7 @@ protected:
 
     cv::VideoCapture cap;
 
+
     //for asynch looping
     std::thread capture_thread;
     std::atomic<bool> running{false};
@@ -83,7 +84,7 @@ private:
     bool started = false;
     bool first_consumed = false;
 
-    
+    double speed_modulation = 1; // this dovodes the simulated time it waits
 public: 
     uint64_t first_ts = 0;
     uint64_t offset = 0;
@@ -98,4 +99,7 @@ public:
     bool retrieve(cv::Mat& frame) override;
     bool read(cv::Mat& frame) override;
     void release() override;
+
+    //2x speed, 0.25x speed ...
+    inline void setSpeed(double speed) {speed_modulation = 1/speed;}
 };

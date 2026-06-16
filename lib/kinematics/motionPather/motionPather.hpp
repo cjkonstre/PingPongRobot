@@ -58,7 +58,24 @@ private:
     MotionScheduler schedule;
     bool gotoIdleOnFinish;
 
+
 public:
+    struct MotionExpose{ //to expose the current state. for visualization, not much else
+        std::array<double, 3> position  = {}; //yes ik this is a trainwreck of code, id redo all this is ROS if i had the time
+        std::array<double, 3> velocity  = {};
+        std::array<double, 3> acceleration  = {};
+        std::array<double, 3> normal    = {};
+        bool valid = false;
+    };
+
+private:
+    std::atomic<MotionExpose*> snapFront{ new MotionExpose() };
+    std::atomic<MotionExpose*> snapBack { new MotionExpose() };
+
+public:
+
+    inline MotionExpose getSnapshot() const {return *snapFront.load(std::memory_order_acquire);}
+
     ruckig::InputParameter<5> input;
     double velFactor;
 

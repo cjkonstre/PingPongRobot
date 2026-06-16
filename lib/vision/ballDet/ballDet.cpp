@@ -21,41 +21,16 @@ cv::Mat jsonToMat(const json& j)
     return m;
 }
 
-BallDetector::BallDetector(const std::string& configPath, const std::string& camName) {
-    std::ifstream f(configPath);
-    if (!f.is_open()) throw std::runtime_error("Failed to open config file: " + configPath);
-
-    json config;
-    f >> config;
-    f.close();
-
-    if (!config.contains(camName)) throw std::runtime_error("Camera not found in config: " + camName);
-
-    const auto& cam = config.at(camName);
-    mu    = jsonToMat(cam["mu"]);
-    Sigma = jsonToMat(cam["Sigma"]);
-
-    if (mu.empty() || Sigma.empty()) throw std::runtime_error("Invalid model contents");
-
-    mu.convertTo(mu, CV_32F);
-    Sigma.convertTo(Sigma, CV_32F);
-    cv::invert(Sigma, invS, cv::DECOMP_SVD);
-
-    cv::Mat chol;
-    cv::Cholesky((float*)Sigma.ptr<float>(), Sigma.step, Sigma.rows, nullptr, 0, 0);
-    cv::invert(Sigma, invS, cv::DECOMP_CHOLESKY);
-
-    cv::Mat eigvals, eigvecs;
-    cv::eigen(invS, eigvals, eigvecs);
-    L = eigvecs.t() * cv::Mat::diag(eigvals.mul(eigvals));
-
+BallDetector::BallDetector(const std::string& configPath,
+                           const std::string& camName)
+{
+    // ignore config for now
     bgSub = cv::createBackgroundSubtractorMOG2(
-        200,   // history
+        100,   // history
         16,    // varThreshold
-        false  // no shadow detection
+        false  // no shadows
     );
 }
-
 bool BallDetector::findBall(
     const cv::Mat& im,
     cv::Point2f& center,
@@ -64,71 +39,84 @@ bool BallDetector::findBall(
 ) {
     if (im.empty()) return false;
 
-    cv::Mat frame;
-    cv::GaussianBlur(im, frame, cv::Size(7,7), 0);
+    // --- params (hardcoded for now) ---
+    static const int lowH = 5,  highH = 25;
+    static const int lowS = 100, highS = 255;
+    static const int lowV = 100,  highV = 255;
 
-    cv::Mat fgMask; bgSub->apply(frame, fgMask);
+    static const float MIN_RADIUS = 5.0f;
+    static const float MAX_RADIUS = 40.0f;
 
-    cv::morphologyEx(
-        fgMask, fgMask, cv::MORPH_OPEN,
-        cv::getStructuringElement(cv::MORPH_ELLIPSE, {3,3})
-    );
+    static const double MIN_AREA = 50.0;
+    static const double MIN_CIRCULARITY = 0.2;
 
-    cv::Mat lab; cv::cvtColor(frame, lab, cv::COLOR_BGR2Lab);
+    // --- buffers ---
+    static thread_local cv::Mat blurred, hsv, hsvMask, fgMask, combined;
+    static thread_local cv::Mat kernel =
+        cv::getStructuringElement(cv::MORPH_ELLIPSE, {3,3});
 
-    std::vector<cv::Mat> ch; cv::split(lab, ch);
+    // --- preprocess ---
+    cv::GaussianBlur(im, blurred, {5,5}, 0);
 
-    cv::Mat a, b;
-    ch[1].convertTo(a, CV_32F);
-    ch[2].convertTo(b, CV_32F);
+    // --- background mask ---
+    if (dobg_masking) {
+        bgSub->apply(blurred, fgMask);
+        cv::morphologyEx(fgMask, fgMask, cv::MORPH_CLOSE, kernel, {-1,-1}, 2);
+    } else {
+        fgMask = cv::Mat(im.size(), CV_8U, cv::Scalar(255));
+    }
 
-    cv::Mat ab;
-    cv::hconcat(
-        a.reshape(1, a.total()),
-        b.reshape(1, b.total()),
-        ab
-    );
+    // --- HSV mask ---
+    cv::cvtColor(blurred, hsv, cv::COLOR_BGR2HSV);
+    cv::inRange(hsv,
+        cv::Scalar(lowH, lowS, lowV),
+        cv::Scalar(highH, highS, highV),
+        hsvMask);
 
-    cv::Mat mu_rep; cv::repeat(mu, ab.rows, 1, mu_rep);
+    // --- combine ---
+    cv::bitwise_and(hsvMask, fgMask, combined);
 
-    cv::Mat d; cv::subtract(ab, mu_rep, d);
+    // cleanup
+    cv::morphologyEx(combined, combined, cv::MORPH_OPEN, kernel);
 
-    cv::Mat temp = d * invS;
-    cv::multiply(temp, d, temp);
-
-    cv::Mat score;
-    cv::reduce(temp, score, 1, cv::REDUCE_SUM);
-
-    cv::Mat colorMask = score < likelihoodThresh;
-    colorMask = colorMask.reshape(1, im.rows);
-    colorMask.convertTo(colorMask, CV_8U, 255);
-
-    cv::Mat mask = colorMask;
-    if (dobg_masking) cv::bitwise_and(colorMask, fgMask, mask);
-
-    cv::morphologyEx(
-        mask, mask, cv::MORPH_OPEN,
-        cv::getStructuringElement(cv::MORPH_ELLIPSE, {5,5})
-    );
-    cv::morphologyEx(
-        mask, mask, cv::MORPH_CLOSE,
-        cv::getStructuringElement(cv::MORPH_ELLIPSE, {7,7})
-    );
-
+    // --- contours ---
     std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    cv::findContours(combined, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
     if (contours.empty()) return false;
 
-    auto best = std::max_element(
-        contours.begin(), contours.end(),
-        [](const auto& a, const auto& b) {
-            return cv::contourArea(a) < cv::contourArea(b);
+    // --- select best candidate ---
+    float bestRadius = 0.0f;
+    double bestCircularity = 0.0;
+    cv::Point2f bestCenter;
+
+    for (const auto& contour : contours) {
+        double area = cv::contourArea(contour);
+        if (area < MIN_AREA) continue;
+
+        double perimeter = cv::arcLength(contour, true);
+        if (perimeter < 10.0) continue;
+
+        double circularity = (4.0 * CV_PI * area) / (perimeter * perimeter);
+        if (circularity < MIN_CIRCULARITY) continue;
+
+        cv::Point2f c;
+        float r;
+        cv::minEnclosingCircle(contour, c, r);
+
+        if (r < MIN_RADIUS || r > MAX_RADIUS) continue;
+
+        if (circularity > bestCircularity) {
+            bestCircularity = circularity;
+            bestCenter = c;
+            bestRadius = r;
         }
-    );
+    }
 
-    if (cv::contourArea(*best) < 50) return false;
+    if (bestRadius <= 0.0f) return false;
 
-    cv::minEnclosingCircle(*best, center, rad);
+    center = bestCenter;
+    rad = bestRadius;
     return true;
 }
 

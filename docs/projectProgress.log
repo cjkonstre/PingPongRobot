@@ -157,3 +157,20 @@ comms issues w/ the mc
 recently implemented recording func so it can be replayed and simulated as a cam and hone in detection
 
 03/23 added simulated camera
+
+04/4 been a long time since i added to this. dropped old computer, got new one working with a few upgrades. i htink it is a bit faster
+fixeed the camrec code, made better.
+did some better detection tests, still need to implement better.
+this is taking pretty long... april... college apps, gotta start work on that website. freak
+
+also added like a nice lil 3d visualizer, pretty fast, should be good in the actual thing idk/c
+
+run 
+find . -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.txt" -o -name "*.py" -o -name "*.cmake" -o -name "*.md" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.sh" \) -not \( -path "./build/*" -o -path "./out/*" -o -path "./.git/*" -o -path "./tests/test_data/*"  \) | tee /dev/stderr | xargs wc -l
+to get count of lines of code in file, rn at almost 4000 (!)
+
+04/05 kin is weird, seems that low accelerations mess something up, making it go super fast...
+rn sidestepping it by runnign high (?) accels, which seems to reduce skipping
+
+04/13 -- back from duke visit, super low accs lead to super high speeds. weird
+im stupid, commented out the streaming rate delay \facepalm

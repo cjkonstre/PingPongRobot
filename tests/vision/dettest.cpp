@@ -1,167 +1,169 @@
-#include <opencv2/opencv.hpp>
-#include <iostream>
-#include <algorithm>
-#include <stdexcept>
-#include "misc/timeLog/timeLog.hpp"
+#include "vision/camera/camera.h"
+#include "vision/ballDet/ballDet.h"
+#include "vision/stereo/multiStereo.h"
+#include "config/config.h"
+#include <atomic>
+#include "utils.h"
 
-using namespace std;
+std::atomic<bool> mainLooping(true);
+void signal_handler(int signal) { if (signal == SIGINT) mainLooping = false; }
 
+// HSV trackbar values — defaults tuned for orange
+int lowH = 5,  highH = 25;
+int lowS = 100, highS = 255;
+int lowV = 100,  highV = 255;
 
-//!! any improvements made to this should be carried over to the balldet detection object !!
-//this bypasses it for dev convinience
-int main()
+// MOG2 params — tune these directly
+constexpr int    MOG2_HISTORY    = 100;
+constexpr double MOG2_THRESHOLD  = 16.0;
+constexpr double MOG2_LEARN_RATE = 0.05;
+
+// ball detection params — tune these directly
+constexpr float MIN_BALL_RADIUS = 5.0f;
+constexpr float MAX_BALL_RADIUS = 40.0f;
+
+// one MOG2 subtractor per camera
+cv::Ptr<cv::BackgroundSubtractorMOG2> mog_BL, mog_BR, mog_MR;
+cv::Mat applyMasks(const cv::Mat& frame,
+                   cv::Ptr<cv::BackgroundSubtractorMOG2>& mog)
 {
-    cv::Mat mu, invS;
-    double scrthresh = 10;
+    if (frame.empty()) return frame;
 
-    string configPath = "/home/connor/PingPongRobot/core/config/vision/det_conf.yml";
+    // --- persistent buffers (avoid realloc each frame) ---
+    static thread_local cv::Mat blurred, hsv, hsvMask, fgMask, combined;
+    static thread_local cv::Mat kernel =
+        cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
 
-    cv::FileStorage fs(configPath, cv::FileStorage::READ);
-    cv::Mat Sigma;
-    fs["cam_MR"]["mu"] >> mu;
-    fs["cam_MR"]["Sigma"] >> Sigma;
-    fs.release();
+    // --- output (annotated image) ---
+    cv::Mat output;
+    frame.copyTo(output);
 
-    if (mu.empty() || Sigma.empty()) throw runtime_error("Invalid model contents");
+    // --- blur ---
+    cv::GaussianBlur(frame, blurred, cv::Size(5, 5), 0);
 
-    mu.convertTo(mu, CV_32F);
-    Sigma.convertTo(Sigma, CV_32F);
-    cv::invert(Sigma, invS, cv::DECOMP_SVD);
+    // --- foreground mask ---
+    mog->apply(blurred, fgMask, MOG2_LEARN_RATE);
+    cv::morphologyEx(fgMask, fgMask, cv::MORPH_CLOSE, kernel, {-1,-1}, 2);
 
+    // --- HSV mask ---
+    cv::cvtColor(blurred, hsv, cv::COLOR_BGR2HSV);
+    cv::inRange(hsv,
+        cv::Scalar(lowH, lowS, lowV),
+        cv::Scalar(highH, highS, highV),
+        hsvMask);
 
-    auto bgSub = cv::createBackgroundSubtractorMOG2(200, 16, false);
+    // --- combine masks ---
+   combined =  hsvMask;//cv::bitwise_and(hsvMask, fgMask, combined);
 
-    cv::VideoCapture cap("/dev/cam_MR");
-    if (!cap.isOpened())
-        throw runtime_error("Failed to open camera");
+    // cleanup noise
+    cv::morphologyEx(combined, combined, cv::MORPH_OPEN, kernel);
 
-    cap.set(cv::CAP_PROP_FOURCC,
-            cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
-    cap.set(cv::CAP_PROP_FPS, 120);
+    // --- find contours ---
+    std::vector<std::vector<cv::Point>> contours;
+    contours.reserve(32);
+    cv::findContours(combined, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-    cv::Mat frame;
+    // --- best candidate ---
+    cv::Point2f bestCenter(-1, -1);
+    float bestRadius = 0.0f;
+    double bestCircularity = 0.0;
 
-    while (true)
-    {
-        TIMELOGDT << "start\n";
-        cap >> frame;
-        if (frame.empty()) break;
+    for (const auto& contour : contours) {
+        double area = cv::contourArea(contour);
+        if (area < 50.0) continue;
 
-        TIMELOGDT << "got frame\n";
+        cv::Rect box = cv::boundingRect(contour);
+        if (box.width < MIN_BALL_RADIUS*2 || box.height < MIN_BALL_RADIUS*2)
+            continue;
 
-        cv::Mat blurred;
-        cv::GaussianBlur(frame, blurred, {7,7}, 0);
+        double perimeter = cv::arcLength(contour, true);
+        if (perimeter < 10.0) continue;
 
-        TIMELOGDT << " frae blurred mask gotten\n";
+        double circularity = (4.0 * CV_PI * area) / (perimeter * perimeter);
+        if (circularity < 0.2) continue;
 
-        cv::Mat fgMask;
-        bgSub->apply(blurred, fgMask);
-        cv::morphologyEx(
-            fgMask, fgMask, cv::MORPH_OPEN,
-            cv::getStructuringElement(cv::MORPH_ELLIPSE, {3,3})
-        );
+        cv::Point2f center;
+        float radius;
+        cv::minEnclosingCircle(contour, center, radius);
 
-        TIMELOGDT << " fg mask gotten\n";
+        if (radius < MIN_BALL_RADIUS || radius > MAX_BALL_RADIUS)
+            continue;
 
-        cv::Mat lab;
-        cv::cvtColor(blurred, lab, cv::COLOR_BGR2Lab);
-
-        vector<cv::Mat> ch;
-        cv::split(lab, ch);
-
-        cv::Mat a, b;
-        ch[1].convertTo(a, CV_32F);
-        ch[2].convertTo(b, CV_32F);
-
-        TIMELOGDT << " lab mask gotten\n";
-
-        cv::Mat ab;
-        cv::hconcat(
-            a.reshape(1, a.total()),
-            b.reshape(1, b.total()),
-            ab
-        );
-        TIMELOGDT << "  ab concat\n";
-
-        cv::Mat mu_rep;
-        cv::repeat(mu, ab.rows, 1, mu_rep);
-
-        cv::Mat d = ab - mu_rep;
-
-        cv::Mat temp = d * invS;
-        cv::multiply(temp, d, temp);
-        TIMELOGDT << "  temp calced\n";
-
-        cv::Mat score;
-        cv::reduce(temp, score, 1, cv::REDUCE_SUM);
-
-        TIMELOGDT << "colmask calcs done\n";
-
-        /*
-        double minVal, maxVal;
-        cv::minMaxLoc(score, &minVal, &maxVal);
-
-        std::cout << "min score: " << minVal << std::endl;*/
-
-        cv::Mat distMap = score.reshape(1, frame.rows);
-        cv::Mat distVis;
-        cv::normalize(distMap, distVis, 0, 255, cv::NORM_MINMAX);
-        distVis.convertTo(distVis, CV_8U);
-        cv::bitwise_not(distVis, distVis);
-
-        cv::Mat colorMask = score < scrthresh;
-        colorMask = colorMask.reshape(1, frame.rows);
-        colorMask.convertTo(colorMask, CV_8U, 255);
-
-
-        cv::Mat mask = colorMask;
-        //cv::bitwise_and(colorMask, fgMask, mask); // !!!!!!!!
-
-        TIMELOGDT << "masks raw done\n";
-
-
-        cv::morphologyEx(
-            mask, mask, cv::MORPH_OPEN,
-            cv::getStructuringElement(cv::MORPH_ELLIPSE, {5,5})
-        );
-        cv::morphologyEx(
-            mask, mask, cv::MORPH_CLOSE,
-            cv::getStructuringElement(cv::MORPH_ELLIPSE, {7,7})
-        );
-
-        TIMELOGDT << "mask morpho done\n";
-
-        vector<vector<cv::Point>> contours;
-        cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-        
-        if (!contours.empty())
-        {
-            auto best = max_element(
-                contours.begin(), contours.end(),
-                [](const auto& a, const auto& b)
-                { return cv::contourArea(a) < cv::contourArea(b); }
-            );
-
-            if (cv::contourArea(*best) >= 50)
-            {
-                cv::Point2f center;
-                float rad;
-                cv::minEnclosingCircle(*best, center, rad);
-                cv::circle(frame, center, (int)rad, {0,255,0}, 2);
-            }
+        if (circularity > bestCircularity) {
+            bestCircularity = circularity;
+            bestCenter = center;
+            bestRadius = radius;
         }
-
-        TIMELOGDT << "contourfind finished \n";
-        cv::imshow("bg", fgMask);
-        cv::imshow("Likelihood Map", distVis);
-        cv::imshow("mass", colorMask);
-        cv::imshow("Ball Detection", frame);
-        TIMELOGDT << "loop finished\n\n";
-
-        if (cv::waitKey(1) == 27) break;
     }
 
+    // --- draw annotation directly on output ---
+    if (bestRadius > 0.0f) {
+        cv::circle(output, bestCenter, (int)bestRadius,
+                   cv::Scalar(0, 255, 0), 2);
+
+        cv::circle(output, bestCenter, 3,
+                   cv::Scalar(0, 0, 255), -1);
+
+        cv::putText(output,
+                    "r=" + std::to_string((int)bestRadius),
+                    cv::Point(bestCenter.x + bestRadius + 4, bestCenter.y),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.45,
+                    cv::Scalar(0, 255, 0), 1);
+    }
+
+    return output;
+}
+#define DO_ON_CAMS for (auto*cam:{&cam_BL,&cam_BR,&cam_MR})cam->
+
+int main() {
+    const std::string saveedddir = "/home/connor/PingPongRobot/tests/test_data/";
+    CameraRec cam_BL(saveedddir + "cam_BL_rev.avi", saveedddir + "cam_BL_ts.txt", CONF_PATH + "vision/cam_BL-intrinsics.yml");
+    CameraRec cam_BR(saveedddir + "cam_BR_rev.avi", saveedddir + "cam_BR_ts.txt", CONF_PATH + "vision/cam_BR-intrinsics.yml");
+    CameraRec cam_MR(saveedddir + "cam_MR_rev.avi", saveedddir + "cam_MR_ts.txt", CONF_PATH + "vision/cam_MR-intrinsics.yml");
+
+    synchCamrecsToNow(cam_BL, cam_BR, cam_MR);
+    DO_ON_CAMS setSpeed(0.5);
+
+    /*Camera cam_BL("/dev/cam_BL", CONF_PATH + "vision/cam_BL-intrinsics.yml", 1280, 800, 120, 35);
+    Camera cam_BR("/dev/cam_BR", CONF_PATH + "vision/cam_BR-intrinsics.yml", 1280, 800, 120, 35);
+    Camera cam_MR("/dev/cam_MR", CONF_PATH + "vision/cam_MR-intrinsics.yml", 1920, 1080, 120, 300);
+*/
+    DO_ON_CAMS beginLoop();
+
+    // init one MOG2 per camera (shadow detection off — faster, cleaner)
+    mog_BL = cv::createBackgroundSubtractorMOG2(MOG2_HISTORY, MOG2_THRESHOLD, false);
+    mog_BR = cv::createBackgroundSubtractorMOG2(MOG2_HISTORY, MOG2_THRESHOLD, false);
+    mog_MR = cv::createBackgroundSubtractorMOG2(MOG2_HISTORY, MOG2_THRESHOLD, false);
+
+    // HSV sliders only
+    cv::namedWindow("HSV Controls", cv::WINDOW_NORMAL);
+    cv::createTrackbar("Low  H", "HSV Controls", &lowH,  179);
+    cv::createTrackbar("High H", "HSV Controls", &highH, 179);
+    cv::createTrackbar("Low  S", "HSV Controls", &lowS,  255);
+    cv::createTrackbar("High S", "HSV Controls", &highS, 255);
+    cv::createTrackbar("Low  V", "HSV Controls", &lowV,  255);
+    cv::createTrackbar("High V", "HSV Controls", &highV, 255);
+
+    std::signal(SIGINT, signal_handler);
+    while (mainLooping.load(std::memory_order_relaxed)) {
+        cv::Mat frame, display;
+
+        frame = cam_BL.frame_buffer[0].frame;
+        if (!frame.empty()) cv::imshow("cambl_mask", applyMasks(frame, mog_BL));
+
+        frame = cam_BR.frame_buffer[0].frame;
+        if (!frame.empty()) cv::imshow("cambr_mask", applyMasks(frame, mog_BR));
+
+        frame = cam_MR.frame_buffer[0].frame;
+        if (!frame.empty()) cv::imshow("cammr_mask", applyMasks(frame, mog_MR));
+
+         if (cv::waitKey(1)==27) break;
+    }
+
+    std::cout << "exited\n";
+    cam_BL.release();
+    cam_BR.release();
+    cam_MR.release();
+    std::cout << "all done! :)\n";
     return 0;
 }

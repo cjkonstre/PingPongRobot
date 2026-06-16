@@ -1,6 +1,5 @@
-//both settings and config, as its pretty small rn
-//should include form lib, but not util
-
+//where the main config settings run. not specifics
+//pretty unorganized rn ik
 #pragma once
 
 #include "kinematics/Pose.h"
@@ -66,3 +65,4 @@ constexpr Pose home_pose{{TABLE_WIDTH/2, PADDLE_HEIGHT/2, 8._mm},
 constexpr Pose idle_pose{{TABLE_WIDTH/2, 50._cm, 0.4_m}, 
                          ORI_sp_FORWARD};
 
+#define DO_STUBBEDCAMS //simulates cameras from prerecorded footage

@@ -11,6 +11,9 @@
 #include <opencv2/aruco.hpp>
 #include <chrono>
 
+#include "misc/3dRenderer/3dRenderer.h"
+
+
 using namespace std::chrono;
 
 cv::Mat cameraMatrix, distCoeffs;
@@ -49,20 +52,6 @@ inline std::array<double, 5> operator/(const std::array<double, 5>& a, const dou
     return c;
 }
 
-void print_state_table(
-    const auto& p,
-    const auto& v,
-    const auto& a,
-    const auto& j
-) {
-   std::cout << "pos : "; for (double pp: p) std::cout << pp << ", "; std::cout << "\n";
-   std::cout << "vel : "; for (double pp: v) std::cout << pp << ", "; std::cout << "\n";
-   std::cout << "acc : "; for (double pp: a) std::cout << pp << ", "; std::cout << "\n";
-   std::cout << "jerk: "; for (double pp: j) std::cout << pp << ", "; std::cout << "\n";
-   std::cout << "\n";
-   
-}
-
 int main() {
     auto kinConfig = load_configs(KINCONFIG_PATH);
     std::cout << "configs loaded\n";
@@ -92,40 +81,41 @@ int main() {
     Pose target; 
     target.pos = {home_pose.pos[0], TABLE_LENGTH-50._cm, home_pose.pos[2]+50._cm};
     target.ori = {0, 0}; //bounds of both at [-pi/2, pi/2]
-    mp.setTarget(target,  Pose0vels);
+    mp.setTarget(target,  Pose0vels, 5);
     Pose initPos = target;
 
     /* --start code-- */
     waitInput("begin");
     mp.begin(); //idlepos by default once started 
+    viz3d::init(1280, 720, "pos");
+
 
     double markerSizeMeters = 10.5/100.f;
-    std::string cam_path =                                                "/dev/video0";
-    std::string cam_intrinsics = "/home/connor/PingPongRobot/core/config/vision/video0-intrinsics.yml";
+    std::string cam_path =                                                "/dev/video2";
+    std::string cam_intrinsics = "/home/connor/PingPongRobot/core/config/vision/video2-intrinsics.yml";
     loadCamera(cam_intrinsics);
 
     cv::VideoCapture cap(cam_path, cv::CAP_V4L2);
     cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G'));
-    cap.set(cv::CAP_PROP_FPS, 30);
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 800);
+    cap.set(cv::CAP_PROP_FPS, 120);
     if (!cap.isOpened()) return -1;
 
-    auto dict = cv::aruco::getPredefinedDictionary(
-        cv::aruco::DICT_5X5_250
-    );
+    auto dict = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
 
     std::vector<int> ids;
     std::vector<std::vector<cv::Point2f>> corners;
 
-    std::vector<Pose> prevposs;
-    std::vector<double> times;
-
-    milliseconds lastt;
+    renderUtils::plot::TripleBuf posBuf, velBuf, accBuf;
+    auto plotT0 = std::chrono::steady_clock::now();
+    const float plotWindow = 10.0f;   // seconds of history visible
 
     while (true){
         cv::Mat frame;
         cap.grab();        // drop frame
         cap.retrieve(frame);
-        if (frame.empty()) break;
+        if (frame.empty()) continue;
 
         cv::aruco::detectMarkers(frame, dict, corners, ids);
 
@@ -158,52 +148,47 @@ int main() {
 
                 rvecToYawPitchFromNormal(rvecs[0], pose.ori.theta, pose.ori.phi);
 
-                //for (double pos: pose.pos)std::cout << pos << ", ";
-                //std::cout <<  "theta: " << pose.ori.theta << "  phi: " << pose.ori.phi << "\r";
-                
-                double now = std::chrono::duration<double>(
-                    std::chrono::steady_clock::now().time_since_epoch()
-                ).count();
-
-
-                if (prevposs.size()==4) prevposs.pop_back();
-                prevposs.insert(prevposs.begin(), pose);
-                if (times.size()==4) times.pop_back();
-                times.insert(times.begin(), now);
-
-                if (prevposs.size()==4) {
-                    double dt_v0 = times[0] - times[1];
-                    double dt_v1 = times[1] - times[2];
-                    double dt_v2 = times[2] - times[3];
-                    auto v0 = (prevposs[0].to5vec() - prevposs[1].to5vec())/dt_v0;
-                    auto v1 = (prevposs[1].to5vec() - prevposs[2].to5vec())/dt_v1;
-                    auto v2 = (prevposs[2].to5vec() - prevposs[3].to5vec())/dt_v2;
-
-                    double dt_a0 = (dt_v0+dt_v1)/2;
-                    double dt_a1 = (dt_v1+dt_v2)/2;
-                    auto a0 = (v0-v1)/dt_a0;
-                    auto a1 = (v1-v2)/dt_a1;
-
-                    double dt_j = (dt_a0+dt_a1)/2;
-                    auto j = (a0-a1)/dt_j;
-
-                    print_state_table(prevposs[0].to5vec(), v0, a0, j);
-                }
-
                 mp.setTarget(pose, Pose0vels);
             }
 
         }
 
+
         cv::imshow("pose", frame);
         auto k=cv::waitKey(5);
         if (k == 27) break;
+
+        viz3d::begin();
+        renderUtils::vis3d::drawAxes();
+        renderUtils::vis3d::drawTable();
+
+        if (mp.getSnapshot().valid) {
+            auto snap = mp.getSnapshot();
+            renderUtils::vis3d::drawPaddle(kin, snap.position, snap.normal, snap.velocity);
+
+            float tNow = std::chrono::duration<float>(
+                            std::chrono::steady_clock::now() - plotT0).count();
+            posBuf.add(tNow, snap.position);
+            velBuf.add(tNow, snap.velocity);
+            accBuf.add(tNow, snap.acceleration);
+
+            ImGui::Begin("Motion");
+            renderUtils::plot::plotTriple("Position",     "m",     posBuf, tNow, plotWindow);
+            renderUtils::plot::plotTriple("Velocity",     "m/s",   velBuf, tNow, plotWindow);
+            renderUtils::plot::plotTriple("Acceleration", "m/s^2", accBuf, tNow, plotWindow);
+            ImGui::End();
+        }
+
+        viz3d::end();
     }
+
+    cv::destroyAllWindows();
 
     waitInput("home");
     mp.setTarget(home_pose, Pose0vels, 2);
     sleep(3);
     mp.stop();
+    viz3d::end();
     return 0;
 
 }

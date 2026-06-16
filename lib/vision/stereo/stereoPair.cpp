@@ -7,7 +7,7 @@ StereoPair::StereoPair(Camera& c1, Camera& c2, std::string stereoConf_path):
     cam1(c1), cam2(c2) {
 
     std::string filename = "/home/connor/PingPongRobot/core/config/vision/" + cam1.capName + "+" + cam2.capName + "-stereoConf";
-    cv::FileStorage fs(filename, cv::FileStorage::WRITE);
+    cv::FileStorage fs(filename, cv::FileStorage::READ);
     fs["R"] >> R;
     fs["T"] >> T;
     fs["E"] >> E;
@@ -41,4 +41,110 @@ GaussBlob<3> StereoPair::get3dMeasurement(
     measurement.cov = covariance;
 
     return measurement;
+}
+
+bool StereoPair::calibratePnP(
+    const std::vector<cv::Point3f>& objectPoints,
+    const std::vector<cv::Point2f>& imagePoints1,
+    const std::vector<cv::Point2f>& imagePoints2,
+    const Camera& cam1,
+    const Camera& cam2,
+    cv::Mat& R,
+    cv::Mat& T,
+    cv::Mat& E,
+    cv::Mat& F
+) {
+    if (objectPoints.size() < 6 ||
+        imagePoints1.size() != objectPoints.size() ||
+        imagePoints2.size() != objectPoints.size()) {
+        std::cerr << "invlid input sizes for cali\n";
+        return false;
+    }
+
+    cv::Mat rvec1, tvec1;
+    cv::Mat rvec2, tvec2;
+
+    bool ok1 = cv::solvePnP(
+        objectPoints,
+        imagePoints1,
+        cam1.intrinsics.K,
+        cam1.intrinsics.D,
+        rvec1,
+        tvec1,
+        false,
+        cv::SOLVEPNP_ITERATIVE
+    );
+
+    bool ok2 = cv::solvePnP(
+        objectPoints,
+        imagePoints2,
+        cam2.intrinsics.K,
+        cam2.intrinsics.D,
+        rvec2,
+        tvec2,
+        false,
+        cv::SOLVEPNP_ITERATIVE
+    );
+
+    if (!ok1 || !ok2) {
+        std::cerr << "solvePnP failed\n";
+        return false;
+    }
+
+    cv::Mat R1, R2;
+    cv::Rodrigues(rvec1, R1);
+    cv::Rodrigues(rvec2, R2);
+
+    // cam1 → cam2
+    R = R2 * R1.t();
+    T = tvec2 - R * tvec1;
+
+    cv::Mat tx = (cv::Mat_<double>(3,3) <<
+        0, -T.at<double>(2), T.at<double>(1),
+        T.at<double>(2), 0, -T.at<double>(0),
+        -T.at<double>(1), T.at<double>(0), 0
+    );
+
+    E = tx * R;
+    F = cam2.intrinsics.K.inv().t() * E * cam1.intrinsics.K.inv();
+
+    // diagnostics (optional but useful)
+    cv::Mat rvec_rel;
+    cv::Rodrigues(R, rvec_rel);
+    double rotation_deg = cv::norm(rvec_rel) * 180.0 / CV_PI;
+
+    std::cout << "Baseline (|T|): " << cv::norm(T) << "\n";
+    std::cout << "Relative rotation: " << rotation_deg << " deg\n";
+
+    return true;
+}
+
+bool StereoPair::calibrateToFile(
+    const std::vector<cv::Point3f>& objectPoints,
+    const std::vector<cv::Point2f>& imagePoints1,
+    const std::vector<cv::Point2f>& imagePoints2,
+    Camera& cam1,
+    Camera& cam2,
+    const std::string& outputPath
+) {
+    cv::Mat R, T, E, F;
+
+    if (!calibratePnP(objectPoints, imagePoints1, imagePoints2,
+                      cam1, cam2, R, T, E, F)) return false;
+
+    cv::FileStorage fs(outputPath, cv::FileStorage::WRITE);
+    if (!fs.isOpened()) {
+        std::cerr << "Failed to open " << outputPath << "\n";
+        return false;
+    }
+
+    fs << "R" << R;
+    fs << "T" << T;
+    fs << "E" << E;
+    fs << "F" << F;
+    fs.release();
+
+    std::cout << "Saved to " << outputPath << "\n";
+
+    return true;
 }

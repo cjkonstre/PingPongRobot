@@ -6,7 +6,8 @@ Eigen::Matrix<double, 6, 3> KalmanModel::get_kalmanGain(const Eigen::Matrix<doub
 }
 
 
-void combine(const Eigen::Matrix<double, 3, 1>& measurement_mu, const Eigen::Matrix<double, 3, 3>& measurement_cov) {
+void KalmanModel::combine(const Eigen::Matrix<double, 3, 1>& measurement_mu, 
+             const Eigen::Matrix<double, 3, 3>& measurement_cov) {
     auto K = get_kalmanGain(measurement_cov);
 
     state = state+K*(measurement_mu-sensor_model*state);

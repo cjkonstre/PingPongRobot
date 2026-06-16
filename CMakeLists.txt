@@ -1,45 +1,92 @@
 cmake_minimum_required(VERSION 3.10.0)
 cmake_policy(SET CMP0079 NEW)
+set(CMAKE_TOOLCHAIN_FILE "$ENV{HOME}/vcpkg/scripts/buildsystems/vcpkg.cmake")
 project(PingPongRobot VERSION 0.1.0 LANGUAGES C CXX)
 
-include(FetchContent)
-
+# ===== Global Settings =====
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# ===== Dependencies =====
-find_package(OpenCV REQUIRED)
+include(FetchContent)
+
+# ===== System / Pre-installed =====
+find_package(OpenCV    REQUIRED)
 find_package(Boost 1.66 REQUIRED COMPONENTS system)
-find_package(Threads REQUIRED)
-find_package(Eigen3 REQUIRED)
+find_package(Threads   REQUIRED)
+find_package(Eigen3    REQUIRED)
+find_package(Ceres     REQUIRED)
+find_package(Python3   REQUIRED COMPONENTS Interpreter Development NumPy)
+
+# ===== Ruckig =====
 find_package(Ruckig REQUIRED)
-find_package(Ceres REQUIRED)
 if(NOT TARGET Ruckig::Ruckig)
     add_library(Ruckig::Ruckig SHARED IMPORTED)
     set_target_properties(Ruckig::Ruckig PROPERTIES
-        IMPORTED_LOCATION "/usr/local/lib/libruckig.so"
+        IMPORTED_LOCATION          "/usr/local/lib/libruckig.so"
         INTERFACE_INCLUDE_DIRECTORIES "/usr/local/include"
     )
 endif()
 
-find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED) #matplotlib
+find_package(glfw3 REQUIRED)
+find_package(GLEW  REQUIRED)
+find_package(glm   REQUIRED)
+find_package(OpenGL REQUIRED)
+
+
+# ===== FetchContent =====
+FetchContent_Declare(nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+# ===== ImGui + ImPlot =====
+FetchContent_Declare(imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        v1.91.5-docking
+)
+FetchContent_Declare(implot
+    GIT_REPOSITORY https://github.com/epezent/implot.git
+    GIT_TAG        v0.16
+)
+FetchContent_MakeAvailable(imgui implot)
+
+add_library(imgui_implot STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+    ${implot_SOURCE_DIR}/implot.cpp
+    ${implot_SOURCE_DIR}/implot_items.cpp
+)
+target_include_directories(imgui_implot PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+    ${implot_SOURCE_DIR}
+)
+target_compile_definitions(imgui_implot PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLEW)
+target_link_libraries(imgui_implot PUBLIC glfw GLEW::GLEW OpenGL::GL)
+
+# ===== Interface Targets =====
 add_library(matplotlibcpp INTERFACE)
 target_include_directories(matplotlibcpp INTERFACE /usr/local/include/matplotlib-cpp)
 target_link_libraries(matplotlibcpp INTERFACE Python3::Python Python3::NumPy)
 
-FetchContent_Declare(
-  nlohmann_json
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG        v3.11.3
+# ===== Lib Vars =====
+set(UTIL_LIBS
+matplotlibcpp
+nlohmann_json::nlohmann_json
+glfw
+GLEW::GLEW
+glm::glm
+OpenGL::GL
+imgui_implot
 )
-FetchContent_MakeAvailable(nlohmann_json)
 
-
-#lib vars
-set(UTIL_LIBS matplotlibcpp nlohmann_json::nlohmann_json) #set(UTIL_LIBS implot imgui OpenGL::GL glfw matplotlibcpp)
-set(VISION_LIBS ${OpenCV_LIBS} freenect)#arducam_evk_sdk::arducam_evk_sdk)
+set(VISION_LIBS ${OpenCV_LIBS})#arducam_evk_sdk::arducam_evk_sdk)
 set(KIN_LIBS Threads::Threads Ruckig::Ruckig Eigen3::Eigen Boost::system)
 
 # ===== Libraries =====

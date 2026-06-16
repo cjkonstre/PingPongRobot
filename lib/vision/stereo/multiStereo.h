@@ -4,6 +4,7 @@
 #pragma once
 
 #include "vision/stereo/stereoPair.h"
+#include "misc/gaussianBlob.h"
 
 //3 cams = 3 stereo pairs
 //does the stuff, doesnt interpret. returns measurement of the ball.
@@ -19,7 +20,9 @@ public:
 
     std::array<cv::Mat, 3> getAlignedFrames(float thresh = 1); // thresh dets how out of sunch -ness is acceptable. maybe dynamic, idk
 
-    int TriStereo::getMeasurement(GaussBlob<3>& measurement); //oh yeah
-    int GaussBlob<3> getMeasurement(GaussBlob<3>& measurement, 
+    //these guys read into measurement,returning how succesful it was
+    int getMeasurement(GaussBlob<3>& measurement); //oh yeah
+    int getMeasurement(GaussBlob<3>& measurement, 
                                     const GaussBlob<3>& predicted, float uncertaintyF = 1); //predictive ROI
+
 };

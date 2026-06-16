@@ -1,0 +1,6 @@
+stereo is a bit cumbersome, this will replace it
+a more general vision information system, interfaces with the kalman filter and generally is more suitable to the pipleline
+a new name would be good
+
+follows a similar design to stereo, instantiate the cameras seperately. all the thign will do is combine the measurements
+appropriately

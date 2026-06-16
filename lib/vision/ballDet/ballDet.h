@@ -17,6 +17,7 @@ public:
         float& rad,
         cv::Rect roi);
 
+    cv::Mat sensorNoise;
 private:
     cv::Mat mu;      // 1x2
     cv::Mat Sigma;   // 2x2

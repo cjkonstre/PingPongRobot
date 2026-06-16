@@ -21,10 +21,35 @@ cv::Mat jsonToMat(const json& j)
     return m;
 }
 
-BallDetector::BallDetector(const std::string& configPath,
-                           const std::string& camName)
-{
-    // ignore config for now
+BallDetector::BallDetector(const std::string& configPath, const std::string& camName) {
+    std::ifstream f(configPath);
+    if (!f.is_open()) throw std::runtime_error("Failed to open config file: " + configPath);
+
+    json config;
+    f >> config;
+    f.close();
+
+    if (!config.contains(camName)) throw std::runtime_error("Camera not found in config: " + camName);
+
+    const auto& cam = config.at(camName);
+    mu    = jsonToMat(cam["mu"]);
+    Sigma = jsonToMat(cam["Sigma"]);
+    sensorNoise = jsonToMat(cam["det_noise"]);
+
+    if (mu.empty() || Sigma.empty()) throw std::runtime_error("Invalid model contents");
+
+    mu.convertTo(mu, CV_32F);
+    Sigma.convertTo(Sigma, CV_32F);
+    cv::invert(Sigma, invS, cv::DECOMP_SVD);
+
+    cv::Mat chol;
+    cv::Cholesky((float*)Sigma.ptr<float>(), Sigma.step, Sigma.rows, nullptr, 0, 0);
+    cv::invert(Sigma, invS, cv::DECOMP_CHOLESKY);
+
+    cv::Mat eigvals, eigvecs;
+    cv::eigen(invS, eigvals, eigvecs);
+    L = eigvecs.t() * cv::Mat::diag(eigvals.mul(eigvals));
+
     bgSub = cv::createBackgroundSubtractorMOG2(
         100,   // history
         16,    // varThreshold

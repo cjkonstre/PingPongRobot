@@ -158,6 +158,7 @@ recently implemented recording func so it can be replayed and simulated as a cam
 
 03/23 added simulated camera
 
+
 04/4 been a long time since i added to this. dropped old computer, got new one working with a few upgrades. i htink it is a bit faster
 fixeed the camrec code, made better.
 did some better detection tests, still need to implement better.
@@ -174,3 +175,8 @@ rn sidestepping it by runnign high (?) accels, which seems to reduce skipping
 
 04/13 -- back from duke visit, super low accs lead to super high speeds. weird
 im stupid, commented out the streaming rate delay \facepalm
+
+
+6/14 been a while, make the motion react better. aded 3d viz, looks great. robot is super fast, microstep counts do need to be optimised
+  jerk is the main thing causing skipping and allat. might reduce pulley diameter for more torque
+changing vision system so its simpler and better

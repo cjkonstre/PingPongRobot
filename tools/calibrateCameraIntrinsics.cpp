@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
     cout << "Distortion coeffs:\n" << distCoeffs << endl;
 
     string camName = filesystem::path(cameraArg).filename();
-    string filename = "/home/connor/PingPongRobot/core/config/vision/" + camName + "-intrinsics.yml";
+    string filename = "/home/connor/PingPongRobot/core/config/vision/" + camName + "-conf.yml";
 
     FileStorage fs(filename, FileStorage::WRITE);
     fs << "camera_matrix" << cameraMatrix;

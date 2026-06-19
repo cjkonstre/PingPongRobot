@@ -20,7 +20,8 @@ Camera::Camera(const std::string& capPath,
     if (!fs.isOpened()) throw std::runtime_error("failed to open cali file: " + caliPath);
     fs["camera_matrix"] >> K;
     fs["dist_coeffs"] >> D;
-    fs["cam_proj"] >> H; //sensor matrix, H in kalman
+    fs["rot_mat"] >> R;
+    fs["trans_mat"] >> t;
     fs.release();
 
     frame_buffer.assign(frameBuffer_len, Frame{cv::Mat(), 0});

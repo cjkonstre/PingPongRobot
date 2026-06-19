@@ -91,8 +91,8 @@ bool StereoPair::calibratePnP(
     bool ok1 = cv::solvePnP(
         objectPoints,
         imagePoints1,
-        cam1.intrinsics.K,
-        cam1.intrinsics.D,
+        cam1.K,
+        cam1.D,
         rvec1,
         tvec1,
         false,
@@ -102,8 +102,8 @@ bool StereoPair::calibratePnP(
     bool ok2 = cv::solvePnP(
         objectPoints,
         imagePoints2,
-        cam2.intrinsics.K,
-        cam2.intrinsics.D,
+        cam2.K,
+        cam2.D,
         rvec2,
         tvec2,
         false,
@@ -130,7 +130,7 @@ bool StereoPair::calibratePnP(
     );
 
     E = tx * R;
-    F = cam2.intrinsics.K.inv().t() * E * cam1.intrinsics.K.inv();
+    F = cam2.K.inv().t() * E * cam1.K.inv();
 
     // diagnostics (optional but useful)
     cv::Mat rvec_rel;

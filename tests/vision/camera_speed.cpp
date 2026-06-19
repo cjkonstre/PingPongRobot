@@ -57,6 +57,7 @@ int main(int argc, char** argv) {
                   << std::endl;
 
         // Display frame
+        cv::resize(frame, frame, cv::Size(1280*3./4, 800*3./4));
         cv::imshow("Camera", frame);
         if (cv::waitKey(1) == 27) { // press ESC to exit
             break;

@@ -102,12 +102,12 @@ int TriStereo::getMeasurement(GaussBlob<3>& measurement, const GaussBlob<3>& pre
     auto frames = getAlignedFrames();
 
     cv::Rect2f rois[3]; //predictive rois. should speed up ball detection significantly
-    project_gaussian3(
+    /*project_gaussian3(
         predicted,
         cam1.proj, cam2.proj, cam3.proj,
         uncertaintyF,
         rois
-    );
+    );*/
 
     cv::Point2f c1, c2, c3; float r;
     bool ret1 = balldet.findBall(frames[0], c1, r, rois[0]);

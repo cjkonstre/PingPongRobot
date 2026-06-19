@@ -41,8 +41,8 @@ public:
     cv::Mat K;   // camera matrix 
     cv::Mat D;   // distortion coefficients
 
-    cv::Mat H;   // extrinsic
-    //sensor error is not part of camera, its part of the ball det
+    cv::Mat R; //rot mat extrinsics
+    cv::Mat t; //translation mat extr
 
     //instantiations
 

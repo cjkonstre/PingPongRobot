@@ -22,6 +22,11 @@ Camera::Camera(const std::string& capPath,
     fs["dist_coeffs"] >> D;
     fs["rot_mat"] >> R;
     fs["trans_mat"] >> t;
+
+
+    std::string distmodel = "standard";
+    if (!fs["distortion_model"].empty()) fs["distortion_model"] >> distmodel; isFisheye = (distmodel == "fisheye");
+
     fs.release();
 
     frame_buffer.assign(frameBuffer_len, Frame{cv::Mat(), 0});

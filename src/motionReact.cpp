@@ -11,7 +11,8 @@
 #include <opencv2/aruco.hpp>
 #include <chrono>
 
-#include "misc/3dRenderer/3dRenderer.h"
+#include "renderUtils.h"
+
 
 
 using namespace std::chrono;
@@ -52,6 +53,7 @@ inline std::array<double, 5> operator/(const std::array<double, 5>& a, const dou
     return c;
 }
 
+#define DO_VIS_REC
 int main() {
     auto kinConfig = load_configs(KINCONFIG_PATH);
     std::cout << "configs loaded\n";
@@ -83,16 +85,16 @@ int main() {
     target.ori = {0, 0}; //bounds of both at [-pi/2, pi/2]
     mp.setTarget(target,  Pose0vels, 5);
     Pose initPos = target;
-
+intrinsics
     /* --start code-- */
     waitInput("begin");
     mp.begin(); //idlepos by default once started 
     viz3d::init(1280, 720, "pos");
-
+    viz3d::startRec("/home/connor/PingPongRobot/docs/motionReact_01.mp4", 60.0);
 
     double markerSizeMeters = 10.5/100.f;
     std::string cam_path =                                                "/dev/video2";
-    std::string cam_intrinsics = "/home/connor/PingPongRobot/core/config/vision/video2-intrinsics.yml";
+    std::string cam_intrinsics = "/home/connor/PingPongRobot/core/config/vision/video2-conf.yml";
     loadCamera(cam_intrinsics);
 
     cv::VideoCapture cap(cam_path, cv::CAP_V4L2);
@@ -107,7 +109,7 @@ int main() {
     std::vector<int> ids;
     std::vector<std::vector<cv::Point2f>> corners;
 
-    renderUtils::plot::TripleBuf posBuf, velBuf, accBuf;
+    plot::TripleBuf posBuf, velBuf, accBuf;
     auto plotT0 = std::chrono::steady_clock::now();
     const float plotWindow = 10.0f;   // seconds of history visible
 
@@ -159,12 +161,12 @@ int main() {
         if (k == 27) break;
 
         viz3d::begin();
-        renderUtils::vis3d::drawAxes();
-        renderUtils::vis3d::drawTable();
+        vis3d::drawAxes();
+        vis3d::drawTable();
 
         if (mp.getSnapshot().valid) {
             auto snap = mp.getSnapshot();
-            renderUtils::vis3d::drawPaddle(kin, snap.position, snap.normal, snap.velocity);
+            vis3d::drawPaddle(kin, snap.position, snap.normal, snap.velocity);
 
             float tNow = std::chrono::duration<float>(
                             std::chrono::steady_clock::now() - plotT0).count();
@@ -173,9 +175,9 @@ int main() {
             accBuf.add(tNow, snap.acceleration);
 
             ImGui::Begin("Motion");
-            renderUtils::plot::plotTriple("Position",     "m",     posBuf, tNow, plotWindow);
-            renderUtils::plot::plotTriple("Velocity",     "m/s",   velBuf, tNow, plotWindow);
-            renderUtils::plot::plotTriple("Acceleration", "m/s^2", accBuf, tNow, plotWindow);
+            plot::plotTriple("Position",     "m",     posBuf, tNow, plotWindow);
+            plot::plotTriple("Velocity",     "m/s",   velBuf, tNow, plotWindow);
+            plot::plotTriple("Acceleration", "m/s^2", accBuf, tNow, plotWindow);
             ImGui::End();
         }
 

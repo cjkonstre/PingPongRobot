@@ -22,6 +22,11 @@ struct CameraInfo {
     std::string devicePath;
     std::string caliPath;
 
+    bool isFisheye = false;
+
+    int frameWidth = 1280;
+    int frameHeight = 800;
+
     cv::Mat K;
     cv::Mat D;
 
@@ -233,10 +238,10 @@ void loadIntrinsics(CameraInfo& cam) {
 
     fs["camera_matrix"] >> cam.K;
     fs["dist_coeffs"] >> cam.D;
+    std::string distmodel;
+    fs["distortion_model"] >> distmodel; if (distmodel == "fisheye") cam.isFisheye = true;
 
-    if (cam.K.empty() || cam.D.empty()) {
-        throw std::runtime_error("missing camera_matrix or dist_coeffs in: " + cam.caliPath);
-    }
+    if (cam.K.empty() || cam.D.empty()) throw std::runtime_error("missing camera_matrix or dist_coeffs in: " + cam.caliPath);
 
     cam.K.convertTo(cam.K, CV_64F);
     cam.D.convertTo(cam.D, CV_64F);
@@ -253,6 +258,7 @@ void saveCalibrationWithExtrinsics(const CameraInfo& cam) {
     fs << "dist_coeffs" << cam.D;
     fs << "rot_mat" << cam.R;
     fs << "trans_mat" << cam.t;
+    fs << "distortion_model" << (cam.isFisheye ? "fisheye" : "standard");
 
     fs.release();
 }
@@ -476,6 +482,7 @@ SelectionUIResult selectPointFromCamera(
         }
     }
 }
+
 void solveExtrinsics(CameraInfo& cam) {
     if (cam.objectPoints.size() < 4) {
         throw std::runtime_error(cam.name + ": need at least 4 correspondences for solvePnP");
@@ -483,17 +490,43 @@ void solveExtrinsics(CameraInfo& cam) {
 
     cv::Mat rvec;
     cv::Mat tvec;
+    bool ok = false;
 
-    bool ok = cv::solvePnP(
-        cam.objectPoints,
-        cam.imagePoints,
-        cam.K,
-        cam.D,
-        rvec,
-        tvec,
-        false,
-        cv::SOLVEPNP_ITERATIVE
-    );
+    if (cam.isFisheye) {
+        std::vector<cv::Point2f> undistortedNorm;
+
+        cv::fisheye::undistortPoints(
+            cam.imagePoints,
+            undistortedNorm,
+            cam.K,
+            cam.D
+        );
+
+        cv::Mat K_identity = cv::Mat::eye(3, 3, CV_64F);
+        cv::Mat D_empty;
+
+        ok = cv::solvePnP(
+            cam.objectPoints,
+            undistortedNorm,
+            K_identity,
+            D_empty,
+            rvec,
+            tvec,
+            false,
+            cv::SOLVEPNP_ITERATIVE
+        );
+    } else {
+        ok = cv::solvePnP(
+            cam.objectPoints,
+            cam.imagePoints,
+            cam.K,
+            cam.D,
+            rvec,
+            tvec,
+            false,
+            cv::SOLVEPNP_ITERATIVE
+        );
+    }
 
     if (!ok) {
         throw std::runtime_error(cam.name + ": solvePnP failed");
@@ -504,14 +537,25 @@ void solveExtrinsics(CameraInfo& cam) {
 
     std::vector<cv::Point2f> projected;
 
-    cv::projectPoints(
-        cam.objectPoints,
-        rvec,
-        tvec,
-        cam.K,
-        cam.D,
-        projected
-    );
+    if (cam.isFisheye) {
+        cv::fisheye::projectPoints(
+            cam.objectPoints,
+            projected,
+            rvec,
+            tvec,
+            cam.K,
+            cam.D
+        );
+    } else {
+        cv::projectPoints(
+            cam.objectPoints,
+            rvec,
+            tvec,
+            cam.K,
+            cam.D,
+            projected
+        );
+    }
 
     double sumPx = 0.0;
     double sumSqPx = 0.0;
@@ -529,19 +573,33 @@ void solveExtrinsics(CameraInfo& cam) {
 
     cv::Mat cameraCenterWorld = -cam.R.t() * cam.t;
 
+    std::vector<cv::Point2f> undistortedNorm;
+
+    if (cam.isFisheye) {
+        cv::fisheye::undistortPoints(
+            cam.imagePoints,
+            undistortedNorm,
+            cam.K,
+            cam.D
+        );
+    } else {
+        cv::undistortPoints(
+            cam.imagePoints,
+            undistortedNorm,
+            cam.K,
+            cam.D
+        );
+    }
+
     double sumRayM = 0.0;
     double sumSqRayM = 0.0;
     double maxRayM = 0.0;
 
-    cv::Mat Kinv = cam.K.inv();
-
     for (size_t i = 0; i < cam.objectPoints.size(); ++i) {
-        const cv::Point2f& uv = cam.imagePoints[i];
+        const cv::Point2f& uvn = undistortedNorm[i];
         const cv::Point3f& Pw_f = cam.objectPoints[i];
 
-        cv::Mat pix = (cv::Mat_<double>(3, 1) << uv.x, uv.y, 1.0);
-
-        cv::Mat rayCam = Kinv * pix;
+        cv::Mat rayCam = (cv::Mat_<double>(3, 1) << uvn.x, uvn.y, 1.0);
         rayCam = rayCam / cv::norm(rayCam);
 
         cv::Mat rayWorld = cam.R.t() * rayCam;
@@ -595,263 +653,277 @@ void solveExtrinsics(CameraInfo& cam) {
     else std::cout << "  3D consistency: poor; " << std::endl;
 }
 
+void rescaleSavedImagePoints(
+    std::vector<CameraInfo>& cameras,
+    const std::string& camName,
+    float sx,
+    float sy
+) {
+    for (auto& cam : cameras) {
+        if (cam.name != camName) {
+            continue;
+        }
+
+        for (auto& p : cam.imagePoints) {
+            p.x *= sx;
+            p.y *= sy;
+        }
+
+        std::cout << "rescaled saved image points for "
+                  << cam.name
+                  << " by sx=" << sx
+                  << " sy=" << sy
+                  << std::endl;
+    }
+}
+
 //#define DO_DATA_COLLECTION
 
 int main() {
-    try {
-        std::vector<cv::Point2f> pointsArr = {
-            {0, TABLE_LENGTH - 10._cm},
-            {0, TABLE_LENGTH - 50._cm},
-            {0, 60._cm},
-            {0, 30._cm},
-            {0, 0},
+    std::vector<cv::Point2f> pointsArr = {
+        {0, TABLE_LENGTH - 10._cm},
+        {0, TABLE_LENGTH - 50._cm},
+        {0, 60._cm},
+        {0, 30._cm},
+        {0, 0},
 
-            {40._cm, TABLE_LENGTH - 10._cm},
-            {TABLE_WIDTH / 2 - 50._cm, TABLE_LENGTH - 50._cm},
-            {30._cm, 60._cm},
-            {30._cm, 30._cm},
-            {30._cm, 0._cm},
+        {40._cm, TABLE_LENGTH - 10._cm},
+        {TABLE_WIDTH / 2 - 50._cm, TABLE_LENGTH - 50._cm},
+        {30._cm, 60._cm},
+        {30._cm, 30._cm},
+        {30._cm, 0._cm},
 
-            {60._cm, 60._cm},
-            {60._cm, 30._cm},
-            {60._cm, 0._cm},
+        {60._cm, 60._cm},
+        {60._cm, 30._cm},
+        {60._cm, 0._cm},
 
-            {TABLE_WIDTH / 2, TABLE_LENGTH - 10._cm},
-            {TABLE_WIDTH / 2, TABLE_LENGTH - 50._cm},
+        {TABLE_WIDTH / 2, TABLE_LENGTH - 10._cm},
+        {TABLE_WIDTH / 2, TABLE_LENGTH - 50._cm},
 
-            {TABLE_WIDTH, TABLE_LENGTH - 10._cm},
-            {TABLE_WIDTH, TABLE_LENGTH - 50._cm},
-            {TABLE_WIDTH, 60._cm},
-            {TABLE_WIDTH, 30._cm},
-            {TABLE_WIDTH, 0},
+        {TABLE_WIDTH, TABLE_LENGTH - 10._cm},
+        {TABLE_WIDTH, TABLE_LENGTH - 50._cm},
+        {TABLE_WIDTH, 60._cm},
+        {TABLE_WIDTH, 30._cm},
+        {TABLE_WIDTH, 0},
 
-            {TABLE_WIDTH - 40._cm, TABLE_LENGTH - 10._cm},
-            {TABLE_WIDTH / 2 + 50._cm, TABLE_LENGTH - 50._cm},
-            {TABLE_WIDTH - 30._cm, 60._cm},
-            {TABLE_WIDTH - 30._cm, 30._cm},
-            {TABLE_WIDTH - 30._cm, 0._cm},
+        {TABLE_WIDTH - 40._cm, TABLE_LENGTH - 10._cm},
+        {TABLE_WIDTH / 2 + 50._cm, TABLE_LENGTH - 50._cm},
+        {TABLE_WIDTH - 30._cm, 60._cm},
+        {TABLE_WIDTH - 30._cm, 30._cm},
+        {TABLE_WIDTH - 30._cm, 0._cm},
 
-            {TABLE_WIDTH - 60._cm, 60._cm},
-            {TABLE_WIDTH - 60._cm, 30._cm},
-            {TABLE_WIDTH - 60._cm, 0._cm},
+        {TABLE_WIDTH - 60._cm, 60._cm},
+        {TABLE_WIDTH - 60._cm, 30._cm},
+        {TABLE_WIDTH - 60._cm, 0._cm},
 
-            {TABLE_WIDTH / 2 - 25._cm, TABLE_LENGTH - 50._cm},
-            {TABLE_WIDTH / 2 + 25._cm, TABLE_LENGTH - 50._cm},
-        };
+        {TABLE_WIDTH / 2 - 25._cm, TABLE_LENGTH - 50._cm},
+        {TABLE_WIDTH / 2 + 25._cm, TABLE_LENGTH - 50._cm},
+    };
 
-        std::vector<float> zs = {
-            static_cast<float>(0.0),
-            static_cast<float>(20._cm),
-            static_cast<float>(40._cm),
-            static_cast<float>(60._cm),
-            static_cast<float>(80._cm)
-        };
+    std::vector<float> zs = {
+        static_cast<float>(0.0),
+        static_cast<float>(20._cm),
+        static_cast<float>(40._cm),
+        static_cast<float>(60._cm),
+        static_cast<float>(80._cm)
+    };
 
-        std::vector<CameraInfo> cameras = {
-            {
-                "cam_BL",
-                "/dev/cam_BL",
-                "/home/connor/PingPongRobot/core/config/vision/cam_BL-conf.yml"
-            },
-            {
-                "cam_BR",
-                "/dev/cam_BR",
-                "/home/connor/PingPongRobot/core/config/vision/cam_BR-conf.yml"
-            },
-            {
-                "cam_MR",
-                "/dev/cam_MR",
-                "/home/connor/PingPongRobot/core/config/vision/cam_MR-conf.yml"
-            }
-        };
-
-        const std::string correspondencePath =
-            "/home/connor/PingPongRobot/core/config/vision/extrinsic_points_raw.yml";
-
-        const std::string windowName = "extrinsic calibration";
-        const std::string mapWindowName = "calibration map";
-
-        MapBounds mapBounds {
-            static_cast<float>(-10._cm),
-            static_cast<float>(TABLE_WIDTH + 10._cm),
-            static_cast<float>(-10._cm),
-            static_cast<float>(TABLE_LENGTH + 10._cm)
-        };
-
-        for (auto& cam : cameras) {
-            loadIntrinsics(cam);
-            std::cout << "loaded intrinsics for " << cam.name << std::endl;
+    std::vector<CameraInfo> cameras = {
+        {
+            "cam_BL",
+            "/dev/cam_BL",
+            "/home/connor/PingPongRobot/core/config/vision/cam_BL-conf.yml",
+        },
+        {
+            "cam_BR",
+            "/dev/cam_BR",
+            "/home/connor/PingPongRobot/core/config/vision/cam_BR-conf.yml",
+        },
+        {
+            "cam_MR",
+            "/dev/cam_MR",
+            "/home/connor/PingPongRobot/core/config/vision/cam_MR-conf.yml",
         }
+    };
+
+    const std::string correspondencePath =
+        "/home/connor/PingPongRobot/core/config/vision/extrinsic_points_raw.yml";
+
+    const std::string windowName = "extrinsic calibration";
+    const std::string mapWindowName = "calibration map";
+
+    MapBounds mapBounds {
+        static_cast<float>(-10._cm),
+        static_cast<float>(TABLE_WIDTH + 10._cm),
+        static_cast<float>(-10._cm),
+        static_cast<float>(TABLE_LENGTH + 10._cm)
+    };
+
+    for (auto& cam : cameras) {loadIntrinsics(cam); std::cout << "loaded intrinsics for " << cam.name << std::endl;}
 
 #ifdef DO_DATA_COLLECTION
-        std::vector<cv::VideoCapture> caps;
-        caps.reserve(cameras.size());
+    std::vector<cv::VideoCapture> caps;
+    caps.reserve(cameras.size());
 
-        for (const auto& cam : cameras) {
-            caps.emplace_back(cam.devicePath);
+    for (const auto& cam : cameras) {
+        caps.emplace_back(cam.devicePath);
 
-            if (!caps.back().isOpened()) {
-                throw std::runtime_error("failed to open video stream: " + cam.devicePath);
-            }
-
-            caps.back().set(
-                cv::CAP_PROP_FOURCC,
-                cv::VideoWriter::fourcc('M', 'J', 'P', 'G')
-            );
-
-            caps.back().set(cv::CAP_PROP_FRAME_WIDTH, 1280);
-            caps.back().set(cv::CAP_PROP_FRAME_HEIGHT, 800);
-            caps.back().set(cv::CAP_PROP_FPS, 120);
-            caps.back().set(cv::CAP_PROP_BUFFERSIZE, 1);
-
-            std::cout << "opened stream for " << cam.name << std::endl;
+        if (!caps.back().isOpened()) {
+            throw std::runtime_error("failed to open video stream: " + cam.devicePath);
         }
 
-        cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE);
-        cv::namedWindow(mapWindowName, cv::WINDOW_AUTOSIZE);
+        caps.back().set(
+            cv::CAP_PROP_FOURCC,
+            cv::VideoWriter::fourcc('M', 'J', 'P', 'G')
+        );
 
-        std::vector<std::vector<std::vector<SelectionRecord>>> selections(
+        caps.back().set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+        caps.back().set(cv::CAP_PROP_FRAME_HEIGHT, 800);
+        caps.back().set(cv::CAP_PROP_FPS, 120);
+        caps.back().set(cv::CAP_PROP_BUFFERSIZE, 1);
+
+        std::cout << "opened stream for " << cam.name << std::endl;
+    }
+
+    cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE);
+    cv::namedWindow(mapWindowName, cv::WINDOW_AUTOSIZE);
+
+    std::vector<std::vector<std::vector<SelectionRecord>>> selections(
+        cameras.size(),
+        std::vector<std::vector<SelectionRecord>>(
+            pointsArr.size(),
+            std::vector<SelectionRecord>(zs.size())
+        )
+    );
+
+    size_t totalStates = pointsArr.size() * cameras.size() * zs.size();
+    size_t currentLinear = 0;
+    size_t furthestLinear = 0;
+
+    while (currentLinear < totalStates) {
+        CursorState cur = decodeCursor(
+            currentLinear,
             cameras.size(),
-            std::vector<std::vector<SelectionRecord>>(
-                pointsArr.size(),
-                std::vector<SelectionRecord>(zs.size())
-            )
+            zs.size()
         );
 
-        size_t totalStates = pointsArr.size() * cameras.size() * zs.size();
-        size_t currentLinear = 0;
-        size_t furthestLinear = 0;
+        auto& cam = cameras[cur.camIdx];
 
-        while (currentLinear < totalStates) {
-            CursorState cur = decodeCursor(
-                currentLinear,
-                cameras.size(),
-                zs.size()
-            );
+        const cv::Point2f& xy = pointsArr[cur.xyIdx];
+        float z = zs[cur.zIdx];
 
-            auto& cam = cameras[cur.camIdx];
+        SelectionRecord& rec =
+            selections[cur.camIdx][cur.xyIdx][cur.zIdx];
 
-            const cv::Point2f& xy = pointsArr[cur.xyIdx];
-            float z = zs[cur.zIdx];
+                SelectionUIResult result = selectPointFromCamera(
+        caps,
+        cur.camIdx,
+        windowName,
+        mapWindowName,
+        pointsArr,
+        mapBounds,
+        cam,
+        xy,
+        cur.xyIdx,
+        z,
+        rec
+    );
 
-            SelectionRecord& rec =
-                selections[cur.camIdx][cur.xyIdx][cur.zIdx];
+        if (result.action == SelectionAction::Back) {
+            if (currentLinear > 0) {
+                --currentLinear;
+            }
 
-                    SelectionUIResult result = selectPointFromCamera(
-            caps,
-            cur.camIdx,
-            windowName,
-            mapWindowName,
-            pointsArr,
-            mapBounds,
-            cam,
-            xy,
-            cur.xyIdx,
-            z,
-            rec
-        );
+            continue;
+        }
 
-            if (result.action == SelectionAction::Back) {
-                if (currentLinear > 0) {
-                    --currentLinear;
+        if (result.action == SelectionAction::Next) {
+            if (currentLinear < furthestLinear) {
+                ++currentLinear;
+            }
+
+            continue;
+        }
+
+        rec.visited = true;
+        rec.hasPoint = result.hasPoint;
+
+        if (result.hasPoint) {
+            rec.imagePointOriginal = result.pointOriginal;
+
+            std::cout << "stored "
+                        << cam.name
+                        << " point=" << cur.xyIdx + 1
+                        << " world=("
+                        << xy.x << ", "
+                        << xy.y << ", "
+                        << z << ") image=("
+                        << result.pointOriginal.x << ", "
+                        << result.pointOriginal.y << ")"
+                        << std::endl;
+        } else {
+            std::cout << "skipped "
+                        << cam.name
+                        << " point=" << cur.xyIdx + 1
+                        << " world=("
+                        << xy.x << ", "
+                        << xy.y << ", "
+                        << z << ")"
+                        << std::endl;
+        }
+
+        if (currentLinear == furthestLinear && furthestLinear + 1 < totalStates) {
+            ++furthestLinear;
+        }
+
+        ++currentLinear;
+    }
+
+    for (auto& cam : cameras) {
+        cam.objectPoints.clear();
+        cam.imagePoints.clear();
+    }
+
+    for (size_t camIdx = 0; camIdx < cameras.size(); ++camIdx) {
+        auto& cam = cameras[camIdx];
+
+        for (size_t xyIdx = 0; xyIdx < pointsArr.size(); ++xyIdx) {
+            for (size_t zIdx = 0; zIdx < zs.size(); ++zIdx) {
+                const SelectionRecord& rec =
+                    selections[camIdx][xyIdx][zIdx];
+
+                if (!rec.visited || !rec.hasPoint) {
+                    continue;
                 }
 
-                continue;
-            }
+                const cv::Point2f& xy = pointsArr[xyIdx];
+                float z = zs[zIdx];
 
-            if (result.action == SelectionAction::Next) {
-                if (currentLinear < furthestLinear) {
-                    ++currentLinear;
-                }
-
-                continue;
-            }
-
-            rec.visited = true;
-            rec.hasPoint = result.hasPoint;
-
-            if (result.hasPoint) {
-                rec.imagePointOriginal = result.pointOriginal;
-
-                std::cout << "stored "
-                          << cam.name
-                          << " point=" << cur.xyIdx + 1
-                          << " world=("
-                          << xy.x << ", "
-                          << xy.y << ", "
-                          << z << ") image=("
-                          << result.pointOriginal.x << ", "
-                          << result.pointOriginal.y << ")"
-                          << std::endl;
-            } else {
-                std::cout << "skipped "
-                          << cam.name
-                          << " point=" << cur.xyIdx + 1
-                          << " world=("
-                          << xy.x << ", "
-                          << xy.y << ", "
-                          << z << ")"
-                          << std::endl;
-            }
-
-            if (currentLinear == furthestLinear && furthestLinear + 1 < totalStates) {
-                ++furthestLinear;
-            }
-
-            ++currentLinear;
-        }
-
-        for (auto& cam : cameras) {
-            cam.objectPoints.clear();
-            cam.imagePoints.clear();
-        }
-
-        for (size_t camIdx = 0; camIdx < cameras.size(); ++camIdx) {
-            auto& cam = cameras[camIdx];
-
-            for (size_t xyIdx = 0; xyIdx < pointsArr.size(); ++xyIdx) {
-                for (size_t zIdx = 0; zIdx < zs.size(); ++zIdx) {
-                    const SelectionRecord& rec =
-                        selections[camIdx][xyIdx][zIdx];
-
-                    if (!rec.visited || !rec.hasPoint) {
-                        continue;
-                    }
-
-                    const cv::Point2f& xy = pointsArr[xyIdx];
-                    float z = zs[zIdx];
-
-                    cam.objectPoints.emplace_back(xy.x, xy.y, z);
-                    cam.imagePoints.push_back(rec.imagePointOriginal);
-                }
+                cam.objectPoints.emplace_back(xy.x, xy.y, z);
+                cam.imagePoints.push_back(rec.imagePointOriginal);
             }
         }
+    }
 
-        cv::destroyWindow(windowName);
-        cv::destroyWindow(mapWindowName);
+    cv::destroyWindow(windowName);
+    cv::destroyWindow(mapWindowName);
 
-        for (auto& cap : caps) {
-            cap.release();
-        }
+    for (auto& cap : caps) {
+        cap.release();
+    }
 
-        saveCollectedPoints(correspondencePath, cameras);
+    saveCollectedPoints(correspondencePath, cameras);
 #endif
 
-        loadCollectedPoints(correspondencePath, cameras);
+    loadCollectedPoints(correspondencePath, cameras);
+    rescaleSavedImagePoints(cameras, "cam_MR",1.0f, 720.0f / 800.0f ); //messed up te cali, so rescale in post
 
-        for (auto& cam : cameras) {
-            solveExtrinsics(cam);
-            saveCalibrationWithExtrinsics(cam);
-
-            std::cout << "saved extrinsics to "
-                      << cam.caliPath << std::endl;
-        }
-
-        std::cout << "\nDone.\n";
-        return 0;
+    for (auto& cam : cameras) {
+        solveExtrinsics(cam);
+        saveCalibrationWithExtrinsics(cam);
+        std::cout << "saved extrinsics to " << cam.caliPath << std::endl;
     }
-    catch (const std::exception& e) {
-        std::cerr << "\nERROR: " << e.what() << std::endl;
-        return 1;
-    }
+
+    std::cout << "\nDone.\n";
+    return 0;
 }

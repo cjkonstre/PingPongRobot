@@ -30,3 +30,4 @@ trans_mat: !!opencv-matrix
    dt: d
    data: [ 6.9549072199928752e-01, -1.2521695214634982e+00,
        -9.1908267365108942e-01 ]
+distortion_model: standard

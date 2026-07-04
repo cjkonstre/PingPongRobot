@@ -10,6 +10,8 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 
+#include <opencv2/opencv.hpp>
+
 #include <vector>
 #include <cmath>
 #include <stdexcept>
@@ -46,10 +48,16 @@ static glm::vec3 s_target = {0,0,0};
 static double s_mx = 0, s_my = 0;
 static bool   s_lbtn = false, s_mbtn = false;
 
+static bool s_recording = false;
+static cv::VideoWriter s_writer;
+static int s_recWidth = 0;
+static int s_recHeight = 0;
+static double s_recFps = 60.0;
+// forward declaration
+static void recordFrame();
+
 // ── Callbacks ─────────────────────────────────────────────────────────────
-static void on_scroll(GLFWwindow*, double, double dy) {
-    s_dist = fmaxf(0.1f, s_dist - (float)dy * s_dist * 0.1f);
-}
+static void on_scroll(GLFWwindow*, double, double dy) {s_dist = fmaxf(0.1f, s_dist - (float)dy * s_dist * 0.1f);}
 static void on_button(GLFWwindow* w, int btn, int action, int) {
     if (btn == GLFW_MOUSE_BUTTON_LEFT)   s_lbtn = action == GLFW_PRESS;
     if (btn == GLFW_MOUSE_BUTTON_MIDDLE) s_mbtn = action == GLFW_PRESS;
@@ -78,7 +86,7 @@ void init(int w, int h, const char* title) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#ifdef __APPLE__
+#ifdef __APPLE__ 
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
     glfwWindowHint(GLFW_SAMPLES, 4);
@@ -136,6 +144,7 @@ void init(int w, int h, const char* title) {
 }
 
 void shutdown() {
+    stopRec();
     glDeleteVertexArrays(2, s_vao);
     glDeleteBuffers(2, s_vbo);
     glDeleteProgram(s_prog);
@@ -203,7 +212,12 @@ void end() {
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
+    recordFrame();
+
     glfwSwapBuffers(s_win);
+
+    if (glfwWindowShouldClose(s_win)) stopRec();
+
 }
 
 // ── Primitives ────────────────────────────────────────────────────────────
@@ -226,6 +240,39 @@ void circle(float cx,float cy,float cz, float radius,
         glm::vec3 p1 = glm::vec3{cx,cy,cz} + (t*cosf(a1) + u*sinf(a1)) * radius;
         s_lines.push_back({p0.x,p0.y,p0.z, r,g,b});
         s_lines.push_back({p1.x,p1.y,p1.z, r,g,b});
+    }
+}
+
+void sphere(float cx, float cy, float cz, float radius,
+            float r, float g, float b,
+            int rings, int segments) {
+    
+    // latitude rings, parallel to XY plane
+    for (int i = 1; i < rings; i++) {
+        float v = -0.5f * (float)M_PI + (float)i * (float)M_PI / rings;
+
+        float z = sinf(v) * radius;
+        float rr = cosf(v) * radius;
+
+        circle(cx, cy, cz + z,
+               rr,
+               0, 0, 1,
+               r, g, b,
+               segments);
+    }
+
+    // longitude rings: great circles through Z axis
+    for (int i = 0; i < rings; i++) {
+        float a = (float)i * (float)M_PI / rings;
+
+        float nx = cosf(a);
+        float ny = sinf(a);
+
+        circle(cx, cy, cz,
+               radius,
+               nx, ny, 0,
+               r, g, b,
+               segments);
     }
 }
 
@@ -268,6 +315,72 @@ void axes(float len) {
     line(0,0,0, len,0,0, 1,0.2f,0.2f);
     line(0,0,0, 0,len,0, 0.2f,1,0.2f);
     line(0,0,0, 0,0,len, 0.2f,0.5f,1);
+}
+
+
+void startRec(const std::string& path, double fps) {
+    if (!s_win) {
+        std::cerr << "viz3d: cannot start recording before init()\n";
+        return;
+    }
+
+    int w, h;
+    glfwGetFramebufferSize(s_win, &w, &h);
+
+    s_recWidth = w;
+    s_recHeight = h;
+    s_recFps = fps;
+
+    int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+
+    s_writer.open(
+        path,
+        fourcc,
+        s_recFps,
+        cv::Size(s_recWidth, s_recHeight),
+        true
+    );
+
+    if (!s_writer.isOpened()) {
+        std::cerr << "viz3d: failed to open video writer: " << path << "\n";
+        s_recording = false;
+        return;
+    }
+
+    s_recording = true;
+    std::cout << "viz3d: recording to " << path << "\n";
+}
+
+void stopRec() {
+    if (s_recording) {
+        s_recording = false;
+        s_writer.release();
+        std::cout << "viz3d: recording stopped\n";
+    }
+}
+
+bool isRecording() {return s_recording;}
+
+static void recordFrame() {
+    if (!s_recording || !s_writer.isOpened()) return;
+
+    cv::Mat rgb(s_recHeight, s_recWidth, CV_8UC3);
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_BACK);
+
+    glReadPixels(
+        0, 0,
+        s_recWidth, s_recHeight,
+        GL_RGB,
+        GL_UNSIGNED_BYTE,
+        rgb.data
+    );
+
+    cv::flip(rgb, rgb, 0);
+    cv::cvtColor(rgb, rgb, cv::COLOR_RGB2BGR);
+
+    s_writer.write(rgb);
 }
 
 }

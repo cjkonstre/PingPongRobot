@@ -18,6 +18,7 @@ struct Frame {
 //sensor class. holds information about itself
 //also handles information input
 class Camera {
+    friend class BallDetector;
 protected:
     std::string capPath;
     std::string caliPath;
@@ -43,9 +44,11 @@ public:
 
     cv::Mat R; //rot mat extrinsics
     cv::Mat t; //translation mat extr
+    bool isFisheye = false;
 
     //instantiations
 
+    Camera() = default;
     //no external settings to the rec device
     Camera(const std::string& capPath, const std::string& caliPath); 
 
@@ -71,6 +74,7 @@ public:
     void beginLoop();
     void endLoop();
 
+    //recs to an external file. can be read from the camerarec class
     void beginRecordingLoop(const std::string& savedir);
     void endRecordingLoop();
 };

@@ -101,6 +101,7 @@ while (running.load(std::memory_order_acquire)) {
     }
 
     next_tick += waittime;
+    
     auto result = otg.update(input, output); //ruckig happens here
     output.pass_to_input(input);
 

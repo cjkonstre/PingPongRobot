@@ -53,7 +53,7 @@ private:
 
     // --- constants ---
     static constexpr int LOW_H = 5, HIGH_H = 25;
-    static constexpr int LOW_S = 100, HIGH_S = 255;
+    static constexpr int LOW_S = 150, HIGH_S = 255;
     static constexpr int LOW_V = 100, HIGH_V = 255;
 
     static constexpr float MIN_R = 5.f;

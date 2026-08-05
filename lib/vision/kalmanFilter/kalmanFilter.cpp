@@ -25,7 +25,7 @@ KalmanFilter::KalmanFilter(double dt)
     Q_ *= 0.001;
 
     R_.setIdentity();
-    R_ *= 0.001;
+    R_ *= 0.000;
 }
 
 void KalmanFilter::predict()

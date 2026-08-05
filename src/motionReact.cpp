@@ -85,7 +85,7 @@ int main() {
     target.ori = {0, 0}; //bounds of both at [-pi/2, pi/2]
     mp.setTarget(target,  Pose0vels, 5);
     Pose initPos = target;
-intrinsics
+    
     /* --start code-- */
     waitInput("begin");
     mp.begin(); //idlepos by default once started 

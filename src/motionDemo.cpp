@@ -85,7 +85,7 @@ int main() {
     );
 
     std::array<double, DOFS> home_qs = kin.doIK(home_pose.pos, home_pose.ori.n(), {0,0,0}, {0,0,0}).qs;
-    doHoming_presetPos(*teensy, home_qs); //pulley lens at start pos
+    doHoming_presetPos(*teensy, home_qs);
     
     /* --start code-- */
     waitInput("begin");

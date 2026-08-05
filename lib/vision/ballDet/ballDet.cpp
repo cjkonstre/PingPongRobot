@@ -92,7 +92,7 @@ void BallDetector::loop()
         BallDetection d;
         d.timestamp_us = f.timestamp_us;
 
-        d.found = findBall(f.frame, d.center, d.radius, false);
+        d.found = findBall(f.frame, d.center, d.radius, true);
 
         {
             std::lock_guard lk(det_mtx);

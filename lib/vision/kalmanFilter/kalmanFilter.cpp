@@ -32,6 +32,7 @@ void KalmanFilter::predict()
 {
     state_.mu = F_ * state_.mu;
     state_.cov = F_ * state_.cov * F_.transpose() + Q_;
+    publishSnapshot();
 }
 
 void KalmanFilter::update(const GaussBlob<3>& measurement)
@@ -47,4 +48,6 @@ void KalmanFilter::update(const GaussBlob<3>& measurement)
     // Covariance update
     state_.cov =
         (Eigen::Matrix<double, 6, 6>::Identity() - K * H_) * state_.cov;
+    
+    publishSnapshot();
 }

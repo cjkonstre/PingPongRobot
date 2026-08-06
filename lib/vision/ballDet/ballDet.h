@@ -7,6 +7,7 @@
 #include <mutex>
 
 #include "vision/camera/camera.h"
+#include "vision/kalmanFilter/kalmanFilter.h
 
 struct BallDetection {
     bool found = false;
@@ -17,7 +18,7 @@ struct BallDetection {
 
 class BallDetector {
 public:
-    BallDetector(const std::string& configPath, const std::string& camName);
+    BallDetector(const std::string& configPath, const std::string& camName, const KalmanFilter& kal);
 
     void beginLoop(Camera& cam);
     void endLoop();
@@ -26,12 +27,13 @@ public:
 
 private:
     bool findBall(const cv::Mat& im, cv::Point2f& center, float& rad, bool bg);
-    bool findBall(const cv::Mat& im, cv::Point2f& center, float& rad);
-    bool findBall(const cv::Mat& im, cv::Point2f& center, float& rad, cv::Rect roi);
+    bool findBall(const cv::Mat& im, cv::Point2f& center, float& rad, cv::Rect roi, bool bg);
 
     void loop();
 
 private:
+    const KalmanFilter& kf;
+
     Camera* cam = nullptr;
 
     std::thread worker;
@@ -61,3 +63,4 @@ private:
     static constexpr double MIN_AREA = 50.0;
     static constexpr double MIN_CIRC = 0.2;
 };
+

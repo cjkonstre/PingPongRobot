@@ -19,8 +19,8 @@ private:
     Eigen::Matrix<double, 6, 6> F_;
     Eigen::Matrix<double, 3, 6> H_;
 
-    Eigen::Matrix<double, 6, 6> Q_;
-    Eigen::Matrix<double, 3, 3> R_;
+    Eigen::Matrix<double, 6, 6> Q_;  //process
+    Eigen::Matrix<double, 3, 3> R_; //sensor integration
 
     GaussBlob<6> state_;
 };

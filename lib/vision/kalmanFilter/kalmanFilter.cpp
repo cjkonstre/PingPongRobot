@@ -18,14 +18,14 @@ KalmanFilter::KalmanFilter(double dt)
     // Initial state
     state_.mu.setZero();
     state_.cov.setIdentity();
-    state_.cov *= 0.1;
+    state_.cov *= 0.1; //init cov
 
     // Noise matrices
     Q_.setIdentity();
     Q_ *= 0.001;
 
     R_.setIdentity();
-    R_ *= 0.000;
+    R_ *= 0.0001;
 }
 
 void KalmanFilter::predict()

@@ -101,8 +101,7 @@ GaussBlob<3> InformationSystem<N>::combineMeasurements(
         return out;
     }
 
-    Eigen::Vector3d x =
-        A.completeOrthogonalDecomposition().solve(b);
+    Eigen::Vector3d x =A.completeOrthogonalDecomposition().solve(b);
 
     Eigen::Matrix3d Lambda = Eigen::Matrix3d::Zero();
     Eigen::Vector3d eta = Eigen::Vector3d::Zero();
@@ -137,8 +136,7 @@ GaussBlob<3> InformationSystem<N>::combineMeasurements(
         eta += Ii * Cs[i];
     }
 
-    Eigen::Vector3d mu =
-        Lambda.completeOrthogonalDecomposition().solve(eta);
+    Eigen::Vector3d mu = Lambda.completeOrthogonalDecomposition().solve(eta);
 
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> es(Lambda);
 
@@ -151,15 +149,11 @@ GaussBlob<3> InformationSystem<N>::combineMeasurements(
         double lambda = es.eigenvalues()(i);
 
         double var;
-        if (lambda < minInfo) {
-            var = maxVar;
-        } else {
-            var = 1.0 / lambda;
-        }
+        if (lambda < minInfo) var = maxVar;
+        else var = 1.0 / lambda;
 
-        cov += var
-             * es.eigenvectors().col(i)
-             * es.eigenvectors().col(i).transpose();
+
+        cov += var * es.eigenvectors().col(i)*es.eigenvectors().col(i).transpose();
     }
 
     out.mu = mu;

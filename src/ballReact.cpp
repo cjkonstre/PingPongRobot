@@ -124,19 +124,21 @@ int main() {
     );
 
     //vision
-    const int exposure = 50;
+    
+    const int exposure = 10;
     Camera camBL("/dev/cam_BL", CONF_PATH + "vision/cam_BL-conf.yml", 1280, 800, 120, exposure);
     Camera camBR("/dev/cam_BR", CONF_PATH + "vision/cam_BR-conf.yml", 1280, 800, 120, exposure);
     Camera camMR("/dev/cam_MR", CONF_PATH + "vision/cam_MR-conf.yml", 1920, 1080, 120, exposure*exposure/2);
-    BallDetector bdet_BL(DETCONFIG_PATH, camBL.capName); 
-    BallDetector bdet_BR(DETCONFIG_PATH, camBR.capName); 
-    BallDetector bdet_MR(DETCONFIG_PATH, camMR.capName); 
-    
-    InformationSystem<3> vision({&camBL, &camBR, &camMR}, 
-                                {5., 5., 10.}); //px error in det
 
     float dt = 0.01; //secs. doesnt make a ton of sense to go below 10ms
     KalmanFilter kf(dt);
+
+    BallDetector bdet_BL(DETCONFIG_PATH, camBL.capName, kf); 
+    BallDetector bdet_BR(DETCONFIG_PATH, camBR.capName, kf); 
+    BallDetector bdet_MR(DETCONFIG_PATH, camMR.capName, kf); 
+    
+    InformationSystem<3> vision({&camBL, &camBR, &camMR}, 
+                                {3., 3., 5.}); //px error in det
 
     //manual setup
     std::array<double, DOFS> home_qs = kin.doIK(home_pose.pos, home_pose.ori.n(), {0,0,0}, {0,0,0}).qs;
@@ -149,7 +151,7 @@ int main() {
     camBR.beginLoop(); bdet_BR.beginLoop(camBR);
     camMR.beginLoop(); bdet_MR.beginLoop(camMR);
 
-    mp.setTarget(Pose{{home_pose.pos[0], TABLE_LENGTH-50._cm, home_pose.pos[2]+50._cm}, ORI_sp_FORWARD}, Pose0vels, 5);
+    mp.setTarget(Pose{{home_pose.pos[0], TABLE_LENGTH-50._cm, home_pose.pos[2]+50._cm}, ORI_sp_FORWARD}, Pose0vels, 2);
     mp.begin();
 
     std::signal(SIGINT, signal_handler); 
@@ -210,10 +212,12 @@ int main() {
     });
 
     float lookahead_time = 1.5; //s 
+    float latency = 0.5; //s, latency in reaction times. rn thsi si due to poor calibration and some other stuffs
 
     auto next_tick = std::chrono::steady_clock::now();
     const auto waittime = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(dt));
     while (mainLooping.load(std::memory_order_relaxed)) {
+        TIMELOGDT << "start\n";
         next_tick += waittime;
 
         bdet_BL.latestDetection(det_BL);
@@ -223,17 +227,22 @@ int main() {
 
         measurement = vision.combineMeasurements({det_BL.center, det_BR.center, det_MR.center}, 
                                                  {det_BL.found,  det_BR.found,  det_MR.found});
-
         kf.predict(); kf.update(measurement);
-        computeFlightPath(kf.state().mu, flight_path, lookahead_time);
 
+        TIMELOGDT << "kf updated\n";
+        computeFlightPath(kf.state().mu, flight_path, lookahead_time);
+        TIMELOGDT << "flight pathed\n";
+
+
+        double targetY = TABLE_LENGTH/2-20._cm;
         std::array<double, 6> target; double time2target;
-        bool ret = interpolateAtY(flight_path, TABLE_LENGTH/2, lookahead_time, target, time2target);
+        bool ret = interpolateAtY(flight_path, targetY, lookahead_time, target, time2target);
         if (ret && (target[0]>20._cm && target[0]<TABLE_WIDTH-20._cm) && (target[2]>20._cm && target[2] < 0.7)) {
             Pose target_pose = Pose{{target[0], target[1], target[2]}, ORI_sp_FORWARD};
             Pose target_vel  = Pose{{0, 0.5, 0}, ORI_sp_FORWARD};
-            mp.setTarget(target_pose, target_vel, time2target);
+            mp.setTarget(target_pose, target_vel, time2target-latency);
         }
+        TIMELOGDT << "done\n";
 
         //viz is being run in a diff thread
 
@@ -248,7 +257,7 @@ int main() {
     camMR.release(); bdet_MR.endLoop();
 
     waitInput("home");
-    mp.setTarget(home_pose, Pose0vels);
+    mp.setTarget(home_pose, Pose0vels, 2);
     sleep(3);
     mp.stop();
 

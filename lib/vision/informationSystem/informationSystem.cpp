@@ -56,9 +56,7 @@ GaussBlob<3> InformationSystem<N>::combineMeasurements(
         Eigen::Vector3d t;
 
         for (int r = 0; r < 3; ++r) {
-            for (int c = 0; c < 3; ++c) {
-                R(r, c) = Rcv.at<double>(r, c);
-            }
+            for (int c = 0; c < 3; ++c) R(r, c) = Rcv.at<double>(r, c);
 
             t(r) = tcv.at<double>(r);
         }
@@ -66,11 +64,8 @@ GaussBlob<3> InformationSystem<N>::combineMeasurements(
         std::vector<cv::Point2f> src = { centers[i] };
         std::vector<cv::Point2f> undist;
 
-        if (cam.isFisheye) {
-            cv::fisheye::undistortPoints(src, undist, K, D);
-        } else {
-            cv::undistortPoints(src, undist, K, D);
-        }
+        if (cam.isFisheye) cv::fisheye::undistortPoints(src, undist, K, D);
+        else cv::undistortPoints(src, undist, K, D);
 
         Eigen::Vector3d rayCam;
         rayCam << undist[0].x, undist[0].y, 1.0;
@@ -95,13 +90,13 @@ GaussBlob<3> InformationSystem<N>::combineMeasurements(
 
     GaussBlob<3> out;
 
-    if (used == 0) {
+    if (used == 0) { //contribute no info. sm here seems weird
         out.mu.setZero();
         out.cov = Eigen::Matrix3d::Identity() * 1e6;
         return out;
     }
 
-    Eigen::Vector3d x =A.completeOrthogonalDecomposition().solve(b);
+    Eigen::Vector3d x = A.completeOrthogonalDecomposition().solve(b);
 
     Eigen::Matrix3d Lambda = Eigen::Matrix3d::Zero();
     Eigen::Vector3d eta = Eigen::Vector3d::Zero();
@@ -126,11 +121,9 @@ GaussBlob<3> InformationSystem<N>::combineMeasurements(
 
         sigmaMeters = std::max(sigmaMeters, 0.003);
 
-        Eigen::Matrix3d P =
-            Eigen::Matrix3d::Identity() - ds[i] * ds[i].transpose();
+        Eigen::Matrix3d P = Eigen::Matrix3d::Identity() - ds[i] * ds[i].transpose();
 
-        Eigen::Matrix3d Ii =
-            P / (sigmaMeters * sigmaMeters);
+        Eigen::Matrix3d Ii = P / (sigmaMeters * sigmaMeters);
 
         Lambda += Ii;
         eta += Ii * Cs[i];

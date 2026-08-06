@@ -7,7 +7,7 @@
 #include <mutex>
 
 #include "vision/camera/camera.h"
-#include "vision/kalmanFilter/kalmanFilter.h
+#include "vision/kalmanFilter/kalmanFilter.h"
 
 struct BallDetection {
     bool found = false;
@@ -35,6 +35,11 @@ private:
     const KalmanFilter& kf;
 
     Camera* cam = nullptr;
+    static bool projectStateToRoi(const Camera& cam,
+                              const GaussBlob<6>& x,
+                              int imW, int imH,
+                              double sigma,
+                              cv::Rect& out)
 
     std::thread worker;
     std::atomic<bool> running{false};

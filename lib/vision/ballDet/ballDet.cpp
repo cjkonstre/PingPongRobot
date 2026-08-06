@@ -2,6 +2,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include "misc/timeLog/timeLog.hpp"
+#include "misc/gaussianBlob.h"
 
 using json = nlohmann::json;
 
@@ -57,46 +58,122 @@ bool BallDetector::latestDetection(BallDetection& out) const
     return true;
 }
 
+
+static bool projectStateToRoi(const Camera& cam,
+                              const GaussBlob<6>& x,
+                              int imW, int imH,
+                              double sigma,
+                              cv::Rect& out)
+{
+    const Eigen::Vector3d mu  = x.mu.head<3>();
+    const Eigen::Matrix3d cov = x.cov.topLeftCorner<3,3>();
+
+    cv::Mat Rcv, tcv, K, D;
+    cam.R.convertTo(Rcv, CV_64F);
+    cam.t.convertTo(tcv, CV_64F);
+    cam.K.convertTo(K,   CV_64F);
+    cam.D.convertTo(D,   CV_64F);
+
+    Eigen::Matrix3d R; Eigen::Vector3d t;
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) R(r, c) = Rcv.at<double>(r, c);
+        t(r) = tcv.at<double>(r);
+    }
+
+    const Eigen::Vector3d p = R * mu + t;      // camera frame
+    if (p.z() < 1e-3) return false;            // behind the camera
+
+    // Center: OpenCV projection, exact under distortion / fisheye.
+    cv::Mat rvec; cv::Rodrigues(Rcv, rvec);
+    std::vector<cv::Point3f> obj{
+        cv::Point3f((float)mu.x(), (float)mu.y(), (float)mu.z()) };
+    std::vector<cv::Point2f> img;
+
+    if (cam.isFisheye) cv::fisheye::projectPoints(obj, img, rvec, tcv, K, D);
+    else               cv::projectPoints(obj, rvec, tcv, K, D, img);
+
+    // Size: pinhole linearization of the covariance.
+    const double fx = K.at<double>(0,0), fy = K.at<double>(1,1);
+    const double z = p.z(), z2 = z * z;
+
+    Eigen::Matrix<double,2,3> J;
+    J << fx/z, 0.0,  -fx * p.x() / z2,
+         0.0,  fy/z, -fy * p.y() / z2;
+
+    const Eigen::Matrix2d Spx = J * (R * cov * R.transpose()) * J.transpose();
+
+    double hw = sigma * std::sqrt(std::max(Spx(0,0), 0.0));
+    double hh = sigma * std::sqrt(std::max(Spx(1,1), 0.0));
+
+    hw = std::clamp(hw, 24.0, imW * 0.5);
+    hh = std::clamp(hh, 24.0, imH * 0.5);
+
+    cv::Rect r(cvRound(img[0].x - hw), cvRound(img[0].y - hh),
+               cvRound(2*hw),          cvRound(2*hh));
+    r &= cv::Rect(0, 0, imW, imH);
+
+    if (r.width < 8 || r.height < 8) return false;
+    if (r.area() > 0.4 * imW * imH)  return false;   // crop wouldn't help
+
+    return (out = r), true;
+}
 void BallDetector::loop()
 {
-    uint64_t last_ts = 0;
+    uint64_t last_ts   = 0;
+    bool     prevFound = false;
 
-    while(running) {
+    while (running) {
+
         Frame f;
+        bool haveFrame = false;
 
         {
             std::lock_guard lk(cam->frame_buffer_mutex);
 
-            if(cam->frame_buffer.empty()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                continue;
+            if (!cam->frame_buffer.empty() && cam->frame_buffer.back().timestamp_us > last_ts)
+            {
+                f = cam->frame_buffer.back();
+                haveFrame = true;
             }
-
-            f = cam->frame_buffer.back();
         }
 
-        if(f.timestamp_us == last_ts) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
-        }
-
-        last_ts = f.timestamp_us;
+        if (!haveFrame) {std::this_thread::sleep_for(std::chrono::milliseconds(1)); continue;}
 
         BallDetection d;
+        bool found = false;
+
+        if (prevFound) {
+            cv::Rect roi;
+            if (projectStateToRoi(*cam, kf.snapshot(),
+                                  f.frame.cols, f.frame.rows,
+                                  ROI_SIGMA, roi)) found = findBall(f.frame, d.center, d.radius, roi, false);
+        }
+
+        if (!found) {
+            {
+                std::lock_guard lk(cam->frame_buffer_mutex);
+
+                if (!cam->frame_buffer.empty() && cam->frame_buffer.back().timestamp_us > f.timestamp_us) f = cam->frame_buffer.back();
+            }
+
+            found = findBall(f.frame, d.center, d.radius, true);
+        }
+
+        last_ts   = f.timestamp_us;
+        prevFound = found;
+
+        d.found        = found;
         d.timestamp_us = f.timestamp_us;
-        
-        d.found = findBall(f.frame, d.center, d.radius, true);
 
         {
             std::lock_guard lk(det_mtx);
-
-            if(det_buf.full()) det_buf.pop_front();
-
+            if (det_buf.full()) det_buf.pop_front();
             det_buf.push_back(d);
             lastDet = d;
         }
     }
 }
+
 bool BallDetector::findBall(const cv::Mat& im,
                             cv::Point2f& center,
                             float& rad,
@@ -104,8 +181,7 @@ bool BallDetector::findBall(const cv::Mat& im,
                             bool bg)
 {
 
-    if (im.empty())
-        return false;
+    if (im.empty()) return false;
 
     // Clip ROI to image bounds
     roi &= cv::Rect(0, 0, im.cols, im.rows);

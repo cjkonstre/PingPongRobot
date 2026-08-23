@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.10.0)
 cmake_policy(SET CMP0079 NEW)
-set(CMAKE_TOOLCHAIN_FILE "$ENV{HOME}/vcpkg/scripts/buildsystems/vcpkg.cmake")
 project(PingPongRobot VERSION 0.1.0 LANGUAGES C CXX)
 
 # ===== Global Settings =====
@@ -15,7 +14,7 @@ include(FetchContent)
 find_package(OpenCV    REQUIRED)
 find_package(Boost 1.66 REQUIRED COMPONENTS system)
 find_package(Threads   REQUIRED)
-find_package(Eigen3    REQUIRED)
+find_package(Eigen3 CONFIG REQUIRED)
 find_package(Ceres     REQUIRED)
 find_package(Python3   REQUIRED COMPONENTS Interpreter Development NumPy)
 

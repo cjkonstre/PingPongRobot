@@ -72,17 +72,11 @@ int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         string arg = argv[i];
 
-        if (arg == "--fisheye") {
-            useFisheye = true;
-        } else if (arg == "--camera") {
-            if (i + 1 >= argc) {
-                throw runtime_error("--camera requires an argument");
-            }
-
+        if (arg == "--fisheye") useFisheye = true;
+        else if (arg == "--camera") {
+            if (i + 1 >= argc) throw runtime_error("--camera requires an argument");
             cameraArg = argv[++i];
-        } else {
-            positional.push_back(arg);
-        }
+        } else positional.push_back(arg);
     }
 
     if (cameraArg.empty() || positional.size() < 4) {
@@ -109,8 +103,7 @@ int main(int argc, char** argv) {
     float squareLength = stof(positional[2]);
     float markerLength = stof(positional[3]);
 
-    Ptr<aruco::Dictionary> dictionary =
-        aruco::getPredefinedDictionary(aruco::DICT_5X5_250);
+    Ptr<aruco::Dictionary> dictionary = aruco::getPredefinedDictionary(aruco::DICT_5X5_250);
 
     Ptr<aruco::CharucoBoard> charucoBoard =
         aruco::CharucoBoard::create(
@@ -121,8 +114,7 @@ int main(int argc, char** argv) {
             dictionary
         );
 
-    Ptr<aruco::DetectorParameters> params =
-        aruco::DetectorParameters::create();
+    Ptr<aruco::DetectorParameters> params =  aruco::DetectorParameters::create();
 
     params->cornerRefinementMethod = aruco::CORNER_REFINE_SUBPIX;
 

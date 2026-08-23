@@ -3,7 +3,9 @@
 #include <nlohmann/json.hpp>
 #include "misc/timeLog/timeLog.hpp"
 #include "misc/gaussianBlob.h"
+#include <pthread.h>
 
+//yeah theres a lot of slop here dw about it. gdmit
 using json = nlohmann::json;
 
 static cv::Mat jsonToMat(const json& j)
@@ -81,7 +83,6 @@ static bool projectStateToRoi(const Camera& cam,
     }
 
     const Eigen::Vector3d p = R * mu + t;      // camera frame
-    if (p.z() < 1e-3) return false;            // behind the camera
 
     // Center: OpenCV projection, exact under distortion / fisheye.
     cv::Mat rvec; cv::Rodrigues(Rcv, rvec);
@@ -90,7 +91,7 @@ static bool projectStateToRoi(const Camera& cam,
     std::vector<cv::Point2f> img;
 
     if (cam.isFisheye) cv::fisheye::projectPoints(obj, img, rvec, tcv, K, D);
-    else               cv::projectPoints(obj, rvec, tcv, K, D, img);
+    else               cv::         projectPoints(obj, rvec, tcv, K, D, img);
 
     // Size: pinhole linearization of the covariance.
     const double fx = K.at<double>(0,0), fy = K.at<double>(1,1);
@@ -112,13 +113,16 @@ static bool projectStateToRoi(const Camera& cam,
                cvRound(2*hw),          cvRound(2*hh));
     r &= cv::Rect(0, 0, imW, imH);
 
-    if (r.width < 8 || r.height < 8) return false;
-    if (r.area() > 0.4 * imW * imH)  return false;   // crop wouldn't help
+    //if (r.width < 8 || r.height < 8) return false;
+    //if (r.area() > 0.4 * imW * imH)  return false;   // crop wouldn't help
 
     return (out = r), true;
 }
+
 void BallDetector::loop()
 {
+    pthread_setname_np(pthread_self(), (cam->capName+"Det").c_str());
+
     uint64_t last_ts   = 0;
     bool     prevFound = false;
 
@@ -127,8 +131,7 @@ void BallDetector::loop()
         Frame f;
         bool haveFrame = false;
 
-        {
-            std::lock_guard lk(cam->frame_buffer_mutex);
+        {   std::lock_guard lk(cam->frame_buffer_mutex);
 
             if (!cam->frame_buffer.empty() && cam->frame_buffer.back().timestamp_us > last_ts)
             {
@@ -137,27 +140,33 @@ void BallDetector::loop()
             }
         }
 
-        if (!haveFrame) {std::this_thread::sleep_for(std::chrono::milliseconds(1)); continue;}
+        if (!haveFrame) {std::this_thread::sleep_for(std::chrono::milliseconds(1)); continue;} //spin till have frame
 
         BallDetection d;
         bool found = false;
 
-        if (prevFound) {
+        //auto im = f.image.clone(); //DEBUG!!!
+
+        if (prevFound) { //if the prev was found use roi, else use the reg
             cv::Rect roi;
             if (projectStateToRoi(*cam, kf.snapshot(),
-                                  f.frame.cols, f.frame.rows,
-                                  ROI_SIGMA, roi)) found = findBall(f.frame, d.center, d.radius, roi, false);
+                                  f.image.cols, f.image.rows,
+                                  3, roi)) 
+                found = findBall(f.image, d.center, d.radius, roi, false);
+
+                //cv::rectangle(im, roi, (found ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255)), 5);//DEBUG!!!
         }
 
         if (!found) {
-            {
+            {//use most recent frame
                 std::lock_guard lk(cam->frame_buffer_mutex);
-
                 if (!cam->frame_buffer.empty() && cam->frame_buffer.back().timestamp_us > f.timestamp_us) f = cam->frame_buffer.back();
-            }
-
-            found = findBall(f.frame, d.center, d.radius, true);
+            } found = findBall(f.image, d.center, d.radius, true);
         }
+
+        //if (found) cv::circle(im, d.center, 3, cv::Scalar(0, 255, 0), -1);
+        //cv::imshow(cam->capName + "bdet", im);//DEBUG!!!
+        //cv::waitKey(1);
 
         last_ts   = f.timestamp_us;
         prevFound = found;
@@ -165,7 +174,7 @@ void BallDetector::loop()
         d.found        = found;
         d.timestamp_us = f.timestamp_us;
 
-        {
+        { //push det safely
             std::lock_guard lk(det_mtx);
             if (det_buf.full()) det_buf.pop_front();
             det_buf.push_back(d);

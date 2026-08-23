@@ -2,6 +2,8 @@
 #include "kinematics/motionPather/motionPather.hpp"
 #include "kinematics/SCComms/packet.h"
 #include "misc/timeLog/timeLog.hpp"
+#include <pthread.h>
+
 
 template <typename MC, typename KS>
 MotionPather<MC, KS>::MotionPather(
@@ -79,6 +81,8 @@ void MotionPather<MC, KS>::loop() {
 
 pin_to_core(2);             // change if desired
 set_realtime_priority(80);  // needs CAP_SYS_NICE
+pthread_setname_np(pthread_self(), "motion_pather");
+
 
 auto next_tick = std::chrono::steady_clock::now();
 const auto waittime = std::chrono::duration_cast<std::chrono::steady_clock::duration>(

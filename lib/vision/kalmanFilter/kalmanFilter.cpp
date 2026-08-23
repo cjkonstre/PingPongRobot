@@ -22,10 +22,10 @@ KalmanFilter::KalmanFilter(double dt)
 
     // Noise matrices
     Q_.setIdentity();
-    Q_ *= 0.001;
+    Q_ *= 0.0001;
 
     R_.setIdentity();
-    R_ *= 0.0001;
+    R_ *= 0.00015;
 }
 
 void KalmanFilter::predict()

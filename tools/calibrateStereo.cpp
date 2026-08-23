@@ -11,6 +11,8 @@
 // i want whoever to know that despite this being ai, the code was inititaly written all by me. then after
 // getting tired have some llm fill in the little stuff. dis is hard work, and is not viebcoded
 
+//this is now legacy. use calubrate cam extrinsics!!
+
 using namespace cv;
 using namespace std;
 
@@ -52,10 +54,8 @@ int main(int argc, char** argv) {
     cout << "configs loaded\n";
 
     unique_ptr<MotorController> teensy;
-    try {
-        teensy = make_unique<MotorController>("/dev/ttyACM0");
-    } catch (...) {
-        teensy = make_unique<MotorController>("/dev/ttyACM1");
+    try { teensy = make_unique<MotorController>("/dev/ttyACM0");
+    } catch (...) { teensy = make_unique<MotorController>("/dev/ttyACM1");
     }
 
     KinematicsSolver<DOFS> kin(
@@ -299,10 +299,8 @@ int main(int argc, char** argv) {
             cam_BL, cam_BR,
             CONF_PATH + "vision/camBL-cam_BR-stereoConf.yml"
         );
-    } else {
-        cout << "Not enough data for BL-BR\n";
-    }
-
+    } else cout << "Not enough data for BL-BR\n";
+    
     if (objectPoints_23.size() >= 6) {
         cout << "calibrating BR-MR\n";
         StereoPair::calibrateToFile(

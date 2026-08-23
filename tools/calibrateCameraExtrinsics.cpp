@@ -484,9 +484,7 @@ SelectionUIResult selectPointFromCamera(
 }
 
 void solveExtrinsics(CameraInfo& cam) {
-    if (cam.objectPoints.size() < 4) {
-        throw std::runtime_error(cam.name + ": need at least 4 correspondences for solvePnP");
-    }
+    if (cam.objectPoints.size() < 4) {throw std::runtime_error(cam.name + ": need at least 4 correspondences for solvePnP");}
 
     cv::Mat rvec;
     cv::Mat tvec;
@@ -528,17 +526,14 @@ void solveExtrinsics(CameraInfo& cam) {
         );
     }
 
-    if (!ok) {
-        throw std::runtime_error(cam.name + ": solvePnP failed");
-    }
+    if (!ok) throw std::runtime_error(cam.name + ": solvePnP failed");
 
     cv::Rodrigues(rvec, cam.R);
     cam.t = tvec;
 
     std::vector<cv::Point2f> projected;
 
-    if (cam.isFisheye) {
-        cv::fisheye::projectPoints(
+    if (cam.isFisheye) cv::fisheye::projectPoints(
             cam.objectPoints,
             projected,
             rvec,
@@ -546,8 +541,7 @@ void solveExtrinsics(CameraInfo& cam) {
             cam.K,
             cam.D
         );
-    } else {
-        cv::projectPoints(
+    else cv::projectPoints(
             cam.objectPoints,
             rvec,
             tvec,
@@ -555,7 +549,6 @@ void solveExtrinsics(CameraInfo& cam) {
             cam.D,
             projected
         );
-    }
 
     double sumPx = 0.0;
     double sumSqPx = 0.0;
@@ -575,21 +568,18 @@ void solveExtrinsics(CameraInfo& cam) {
 
     std::vector<cv::Point2f> undistortedNorm;
 
-    if (cam.isFisheye) {
-        cv::fisheye::undistortPoints(
+    if (cam.isFisheye) cv::fisheye::undistortPoints(
             cam.imagePoints,
             undistortedNorm,
             cam.K,
             cam.D
         );
-    } else {
-        cv::undistortPoints(
+    else cv::undistortPoints(
             cam.imagePoints,
             undistortedNorm,
             cam.K,
             cam.D
         );
-    }
 
     double sumRayM = 0.0;
     double sumSqRayM = 0.0;
@@ -660,9 +650,7 @@ void rescaleSavedImagePoints(
     float sy
 ) {
     for (auto& cam : cameras) {
-        if (cam.name != camName) {
-            continue;
-        }
+        if (cam.name != camName) { continue;}
 
         for (auto& p : cam.imagePoints) {
             p.x *= sx;
@@ -680,7 +668,7 @@ void rescaleSavedImagePoints(
 //#define DO_DATA_COLLECTION
 
 int main() {
-    std::vector<cv::Point2f> pointsArr = {
+    const std::vector<cv::Point2f> pointsArr = {
         {0, TABLE_LENGTH - 10._cm},
         {0, TABLE_LENGTH - 50._cm},
         {0, 60._cm},
@@ -830,18 +818,12 @@ int main() {
     );
 
         if (result.action == SelectionAction::Back) {
-            if (currentLinear > 0) {
-                --currentLinear;
-            }
-
+            if (currentLinear > 0) {--currentLinear;}
             continue;
         }
 
         if (result.action == SelectionAction::Next) {
-            if (currentLinear < furthestLinear) {
-                ++currentLinear;
-            }
-
+            if (currentLinear < furthestLinear) {++currentLinear;}
             continue;
         }
 
@@ -872,9 +854,7 @@ int main() {
                         << std::endl;
         }
 
-        if (currentLinear == furthestLinear && furthestLinear + 1 < totalStates) {
-            ++furthestLinear;
-        }
+        if (currentLinear == furthestLinear && furthestLinear + 1 < totalStates) {++furthestLinear;}
 
         ++currentLinear;
     }
@@ -892,9 +872,7 @@ int main() {
                 const SelectionRecord& rec =
                     selections[camIdx][xyIdx][zIdx];
 
-                if (!rec.visited || !rec.hasPoint) {
-                    continue;
-                }
+                if (!rec.visited || !rec.hasPoint) continue;
 
                 const cv::Point2f& xy = pointsArr[xyIdx];
                 float z = zs[zIdx];
@@ -908,9 +886,7 @@ int main() {
     cv::destroyWindow(windowName);
     cv::destroyWindow(mapWindowName);
 
-    for (auto& cap : caps) {
-        cap.release();
-    }
+    for (auto& cap : caps) cap.release();
 
     saveCollectedPoints(correspondencePath, cameras);
 #endif

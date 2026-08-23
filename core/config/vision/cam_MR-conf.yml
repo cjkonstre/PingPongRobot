@@ -1,4 +1,7 @@
 %YAML:1.0
+
+#the correspondence points were taken at 1280 x 720 
+#something happened and rescale was necesarry in order to correct it. 
 ---
 camera_matrix: !!opencv-matrix
    rows: 3

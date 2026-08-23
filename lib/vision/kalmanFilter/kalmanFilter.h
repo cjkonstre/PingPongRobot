@@ -1,6 +1,7 @@
 #pragma once
 
 #include "misc/gaussianBlob.h"
+#include <mutex>
 
 class KalmanFilter
 {

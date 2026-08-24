@@ -1,0 +1,13 @@
+Things this capture does NOT handle — check these by hand on the new machine:
+
+  [ ] Anything built from source / `make install`  (grep your notes / ~/src)
+  [ ] .deb files you downloaded and installed directly
+  [ ] Dotfiles and shell config (~/.bashrc, ~/.config, etc.) — copy separately
+  [ ] Symlinks you set up manually
+  [ ] Anything in /opt or /usr/local you placed by hand
+  [ ] SSH keys, git config, credentials
+  [ ] Cron jobs (`crontab -l`) and systemd user/services you added
+  also vscode stuff, anydesk, etc. 
+
+The udev rules were copied to ./migration/udev/ — restore.sh will place them,
+but double-check device names/paths match on the new hardware.

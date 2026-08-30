@@ -19,145 +19,143 @@
 
 //for program halts
 std::atomic<bool> mainLooping(true); void signal_handler(int signal) {if(signal==SIGINT)mainLooping=false;}
+constexpr double g = 9.81;
 
-constexpr float g = 9.81f;
-void computeFlightPath(
-    const Eigen::Matrix<double, 6, 1>& mu,
-    const Eigen::Vector3d& vel_in,
-    std::array<std::array<double, 6>, 25>& flight_path,
-    double total_time)
+inline GaussBlob<6> propagate(const GaussBlob<6>& s, double dt)
 {
-    Eigen::Vector3d pos = mu.head<3>();
-    Eigen::Vector3d vel = vel_in;
+    Eigen::Matrix<double, 6, 6> F = Eigen::Matrix<double, 6, 6>::Identity();
+    F.block<3, 3>(0, 3) = dt * Eigen::Matrix3d::Identity();
 
+    GaussBlob<6> out = F * s;        
+    out.mu(2) -= g/2 * dt*dt;  
+    out.mu(5) -= g * dt;
+    return out;
+}
+
+inline void bounce(GaussBlob<6>& s)
+{
+    Eigen::Matrix<double, 6, 6> R = Eigen::Matrix<double, 6, 6>::Identity();
+    R(2, 2) = -1.0; R(5, 5) = -1.0;
+    s = R * s;
+    s.mu(2) = 0.0;
+}
+
+
+void computeFlightPath(const GaussBlob<6>& state,
+                       std::array<GaussBlob<6>, 25>& flight_path,
+                       double total_time)
+{
     const double dt = total_time / 25.0;
-
-    Eigen::Vector3d acc(0.0, 0.0, -g);
-
-    for (int i = 0; i < 25; i++)
-    {
-        flight_path[i][0] = pos.x();
-        flight_path[i][1] = pos.y();
-        flight_path[i][2] = pos.z();
-
-        flight_path[i][3] = vel.x();
-        flight_path[i][4] = vel.y();
-        flight_path[i][5] = vel.z();
-
-        vel += acc * dt;
-        pos += vel * dt;
-
-        if (pos[2] <= 0) { vel[2] *= -1; pos[2] = 0; }
+    GaussBlob<6> s = state;
+    for (int i = 0; i < 25; ++i) {
+        flight_path[i] = s;
+        s = propagate(s, dt);
+        if (s.mu(2) <= 0.0) bounce(s);
     }
 }
 
-bool interpolateAtY(
-    const std::array<std::array<double, 6>, 25>& flight_path,
-    double target_y,
-    double total_lookahead_time,
-    std::array<double, 6>& result,
-    double& time_to_point)
+bool interpolateAtY(const std::array<GaussBlob<6>, 25>& flight_path,
+                    double target_y,
+                    double total_lookahead_time,
+                    GaussBlob<6>& result,
+                    double& time_to_point)
 {
     constexpr size_t N = 25;
-    const double dt = total_lookahead_time / (N - 1);
+    const double dt = total_lookahead_time / static_cast<double>(N);  // matches computeFlightPath
 
-    for (size_t i = 0; i + 1 < N; ++i)
-    {
-        const auto& a = flight_path[i];
-        const auto& b = flight_path[i + 1];
+    for (size_t i = 0; i + 1 < N; ++i) {
+        const double y0 = flight_path[i].mu(1);
+        const double y1 = flight_path[i + 1].mu(1);
 
-        const double y0 = a[1];
-        const double y1 = b[1];
+        if ((target_y - y0) * (target_y - y1) > 0.0) continue;
 
-        // Does this segment cross the requested y?
-        if ((target_y >= y0 && target_y <= y1) ||
-            (target_y >= y1 && target_y <= y0))
-        {
-            const double dy = y1 - y0;
+        const double dy = y1 - y0;
+        if (std::abs(dy) < 1e-9) return false;
 
-            // Degenerate segment
-            if (std::abs(dy) < 1e-9)
-                return false;
+        const double f  = (target_y - y0) / dy;
+        const double tf = f * dt;
 
-            // Fraction through this segment
-            const double t = (target_y - y0) / dy;
+        result = propagate(flight_path[i], tf);  
+        if (result.mu(2) <= 0.0) bounce(result); 
+        result.mu(1) = target_y;
 
-            // Interpolate state
-            for (int j = 0; j < 6; ++j)
-                result[j] = a[j] + t * (b[j] - a[j]);
-
-            result[1] = target_y;
-
-            // Time from the start of the trajectory
-            time_to_point = (static_cast<double>(i) + t) * dt;
-
-            return true;
-        }
+        time_to_point = (static_cast<double>(i) + f) * dt;
+        return true;
     }
-
-    // Never reached target_y within the simulated trajectory.
     return false;
 }
 
-// chi-squared, 3 DOF
-constexpr double GATE_95  =  7.81; //tight. 95% of actual measurements get spassed
-constexpr double GATE_99  = 11.34;
-constexpr double GATE_997 = 14.16;   // ~"3-sigma" tail mass -- permissize
-constexpr double GATE_m1en2 = 21.11; //99.99
-constexpr double GATE_m1en3 = 25.90; //99.999
-constexpr double GATE_m1en4 = 30.67; //99.9999
-static double mahalanobis2(const GaussBlob<6>& state, const GaussBlob<3>& meas)
+//might be slow...
+static bool fit_state(const std::vector<std::array<double, 6>>& path,
+                      double dt,
+                      bool& in_air,
+                      GaussBlob<6>& state,        //at the NEWEST sample t = 0
+                      int n = -1,
+                      const double rms_max = 0.03,
+                      const double xy_tol  = 4.0,
+                      const double g_tol   = 4.0)
 {
-    const Eigen::Vector3d y = meas.mu - state.mu.head<3>();     // innovation
-    const Eigen::Matrix3d S = state.cov.topLeftCorner<3,3>()    // filter's pos cov
-                            + meas.cov;                         // measurement cov
-    return y.transpose() * S.ldlt().solve(y);                  // squared distance
-}
+    if (n == -1) n = static_cast<int>(path.size()); 
+    in_air=false;
+    state.mu.setZero(); state.cov.setZero();
 
-//fits least squares
-static bool fit_velocity(const std::vector<std::array<double,6>>& path,
-                         double dt,
-                         bool& in_air,
-                         Eigen::Vector3d& vel, 
-                         int n = -1, // -1 if use entire vec, 
-                         const double rms_max = 0.03, 
-                         const double xy_tol=4.,
-                         const double g_tol = 4)
-{
-    if (n==-1) int n=path.size();
-    in_air = false;
-    vel.setZero();
-
-    if (n < 4) return false;                 // need >3 points for a real quadratic
+    if (n < 5) return false;
 
     Eigen::MatrixXd M(n, 3);
-    Eigen::MatrixXd P(n, 3);                  // columns: x, y, z
-
+    Eigen::MatrixXd P(n, 3);
     for (int i = 0; i < n; ++i) {
-        const double t = -i * dt;           // i=0 newest -> t=0
-        M(i,0) = t*t; M(i,1) = t; M(i,2) = 1.0;
-        P(i,0) = path[i][0];
-        P(i,1) = path[i][1];
-        P(i,2) = path[i][2];
+        const double t = -i * dt;
+        M(i, 0) = t * t; M(i, 1) = t; M(i, 2) = 1.0;
+        P(i, 0) = path[i][0]; P(i, 1) = path[i][1]; P(i, 2) = path[i][2];
     }
 
-    Eigen::Matrix3d N   = M.transpose() * M;
-    Eigen::Matrix<double,3,3> coef = N.ldlt().solve(M.transpose() * P); 
+    const Eigen::Matrix3d N    = M.transpose() * M;
+    const Eigen::Matrix3d Ninv = N.ldlt().solve(Eigen::Matrix3d::Identity());
+    const Eigen::Matrix3d coef = Ninv * (M.transpose() * P);  // rows: a,b,c per axis
 
     const Eigen::MatrixXd resid = P - M * coef;
-    const double rms = std::sqrt(resid.squaredNorm() / (n * 3));
 
-    const double ax = 2.0 * coef(0,0); const double ay = 2.0 * coef(0,1); const double az = 2.0 * coef(0,2);
+    const double rms = std::sqrt(resid.squaredNorm() / (n * 3.0));
+    const double ax = 2.0 * coef(0, 0), ay = 2.0 * coef(0, 1), az = 2.0 * coef(0, 2);
+    in_air = (rms < rms_max) &&
+             (std::abs(ax) < xy_tol) && (std::abs(ay) < xy_tol) &&
+             (std::abs(az + g) < g_tol);
 
-    vel = Eigen::Vector3d(coef(1,0), coef(1,1), coef(1,2));
+    state.mu.head<3>() = coef.row(2).transpose();
+    state.mu.tail<3>() = coef.row(1).transpose();
 
+    for (int ax_i = 0; ax_i < 3; ++ax_i) {
+        const double s2 = resid.col(ax_i).squaredNorm() / (n - 3);
+        state.cov(ax_i,     ax_i)     = s2 * Ninv(2, 2);   // σ_x2
+        state.cov(ax_i + 3, ax_i + 3) = s2 * Ninv(1, 1);   // σ_v2
+        state.cov(ax_i,     ax_i + 3) = s2 * Ninv(1, 2);   // σ_xv
+        state.cov(ax_i + 3, ax_i)     = s2 * Ninv(1, 2);
+    } return true;
+}
 
-    const bool horiz_ok = std::abs(ax) < xy_tol &&
-                          std::abs(ay) < xy_tol;
-    const bool grav_ok  = std::abs(az + -9.81) < g_tol;   // az ~ -9.81
-    const bool fit_ok   = rms < rms_max;
+//the time it takes for a probability mass to pass through plane p. returns false if fails. 
+bool state_transit_time(double& T,
+                        const GaussBlob<6>& state,
+                         Eigen::Vector3d n, //should be normed, but dont think it matters?
+                         double k = 4.0) //k is standard dev perp to the plane, but acts weird bc 3d. 3≈97.1 
+{
 
-    in_air = fit_ok && horiz_ok && grav_ok;
+    Eigen::Matrix<double, 2, 6> P = Eigen::Matrix<double, 2, 6>::Zero();
+    P.block<1, 3>(0, 0) = n.transpose(); P.block<1, 3>(1, 3) = n.transpose();
+    const GaussBlob<2> s = P * state;
+
+    const double w   = -s.mu(1);      // into-speed  −n·μv  (must be > 0 to cross)
+    const double sx2 =  s.cov(0, 0);  // n·Σxx·n
+    const double sxv =  s.cov(0, 1);  // n·Σxv·n — invariant under n -> −n, do NOT flip
+    const double sv2 =  s.cov(1, 1);  // n·Σvv·n
+
+    const double k2=k*k;
+    const double A = w*w - k2*sv2; if (w<= 0.0||A <= 0.0) return false;
+    const double B  = -2*k2*sxv;
+    const double C  = -k2*sx2;
+    const double sq = std::sqrt(B*B - 4.0*A*C);  // ≥ 0 guaranteed
+
+    T = sq / A;
     return true;
 }
 
@@ -167,7 +165,6 @@ static bool fit_velocity(const std::vector<std::array<double,6>>& path,
 //#define VIS_DO3DREC 4 //if negative, no record
 
 int main() {
-    cv::setNumThreads(1);//TEMP
     /* --instantiate and such-- */
 
     auto kinConfig = load_configs(KINCONFIG_PATH);
@@ -230,7 +227,6 @@ int main() {
 
     //ball future flight path points
     std::array<std::array<double, 6>, 25> flight_path;
-    std::array<std::array<double, 6>, 25> flight_path_mu;
 
     std::vector<std::array<double, 6>> prev_path(25);
     std::vector<bool> in_airs(25);
@@ -285,11 +281,6 @@ int main() {
                             flight_path[i][0], flight_path[i][2], flight_path[i][1], 0.75f, 0.25f, 0.);
             }
 
-            for (int i=1; i<flight_path_mu.size(); i++) {
-                viz3d::line(flight_path_mu[i-1][0], flight_path_mu[i-1][2], flight_path_mu[i-1][1],
-                            flight_path_mu[i][0], flight_path_mu[i][2], flight_path_mu[i][1], 0.75f, 0.25f, 0.75);
-            }
-
             for (int i=1; i<prev_path.size(); i++) {
                 viz3d::line(prev_path[i-1][0], prev_path[i-1][2], prev_path[i-1][1],
                             prev_path[i][0], prev_path[i][2], prev_path[i][1], in_airs[i]?0.25f:0.75f, in_airs[i]?0.75f:0.25f, 0.);
@@ -337,13 +328,9 @@ int main() {
         }
         //TIMELOGDT << "kinda real start\n";        
 
-        measurement = vision.combineMeasurements({det_BL.center, det_BR.center, det_MR.center}, 
-                                                 {det_BL.found,  det_BR.found,  det_MR.found});
-
         //TIMELOGDT << "measurements combined\n";                                        
         kf.predict(); 
-        //if (mahalanobis2(kf.state(), measurement) < GATE_m1en3) 
-            kf.update(measurement); //rejection
+        kf.update(measurement); //no rejection
         //TIMELOGDT << "kf updated\n";
 
         prev_path.pop_back();
@@ -356,7 +343,6 @@ int main() {
 
         //TIMELOGDT << "vel fitted\n";
         computeFlightPath(kf.state().mu, vel, flight_path, lookahead_time);
-        computeFlightPath(kf.state().mu, kf.state().mu.tail(3), flight_path_mu, lookahead_time);
         //TIMELOGDT << "flight pathed\n";
 
 
@@ -366,6 +352,9 @@ int main() {
         if (ret && (target[0]>20._cm && target[0]<TABLE_WIDTH-20._cm) && (target[2]>20._cm && target[2] < 0.7)) {
             Pose target_pose = Pose{{target[0], target[1], target[2]}, ORI_sp_FORWARD};
             Pose target_vel  = Pose{{0, 0.5, 0}, ORI_sp_FORWARD};
+
+
+
             mp.setTarget(target_pose, target_vel, time2target-latency);
         }
         //TIMELOGDT << "done\n";

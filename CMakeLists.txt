@@ -18,15 +18,10 @@ find_package(Eigen3 CONFIG REQUIRED)
 find_package(Ceres     REQUIRED)
 find_package(Python3   REQUIRED COMPONENTS Interpreter Development NumPy)
 
-# ===== Ruckig =====
-find_package(Ruckig REQUIRED)
-if(NOT TARGET Ruckig::Ruckig)
-    add_library(Ruckig::Ruckig SHARED IMPORTED)
-    set_target_properties(Ruckig::Ruckig PROPERTIES
-        IMPORTED_LOCATION          "/usr/local/lib/libruckig.so"
-        INTERFACE_INCLUDE_DIRECTORIES "/usr/local/include"
-    )
-endif()
+find_package(httplib CONFIG REQUIRED)
+find_package(ruckig CONFIG REQUIRED)
+
+add_library(Ruckig::Ruckig ALIAS ruckig::ruckig)
 
 find_package(glfw3 REQUIRED)
 find_package(GLEW  REQUIRED)
@@ -143,7 +138,7 @@ add_execs("${CMAKE_SOURCE_DIR}/tests/kinematics"
 
 add_execs("${CMAKE_SOURCE_DIR}/tests/vision"
   PREFIX "test_"
-  LIBS robotlibs core ${UTIL_LIBS} ${VISION_LIBS} ${KIN_LIBS} 
+  LIBS robotlibs core ${UTIL_LIBS} ${VISION_LIBS} ${KIN_LIBS}
 )
 
 # ===== Testing =====

@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <mutex>
+#include <fstream>
 
 
 //used for the asynch looping. allows a synchronizing thread to align frames temporally

@@ -1,5 +1,0 @@
-
-ACTION=="add", SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="6366", ATTR{index}=="0", KERNELS=="1-1", SYMLINK+="cam_BR", MODE="0666", RUN+="/usr/bin/v4l2-ctl -d /dev/%k -c auto_exposure=0 -c exposure_time_absolute=50 -c gain=0"
-ACTION=="add", SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="6366", ATTR{index}=="0", KERNELS=="1-2", SYMLINK+="cam_BL", MODE="0666", RUN+="/usr/bin/v4l2-ctl -d /dev/%k -c auto_exposure=0 -c exposure_time_absolute=20 -c gain=0"
-ACTION=="add", SUBSYSTEM=="video4linux", ATTRS{idVendor}=="32e4", ATTRS{idProduct}=="0234", ATTR{index}=="0", KERNELS=="1-4", SYMLINK+="cam_MR", MODE="0666", RUN+="/usr/bin/v4l2-ctl -d /dev/%k -c auto_exposure=0 -c exposure_time_absolute=50 -c gain=0"
-
